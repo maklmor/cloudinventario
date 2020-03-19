@@ -118,18 +118,25 @@ class InventoryStorage:
        entries[rec["source"]] += 1
 
      # save entry counts
+     sources_save = []
      for source in sources:
+       if not source["source"] in entries:
+         continue
        source["entries"] = entries[source["source"]]
+       sources_save.append(source)
 
      if len(sources) == 0:
        return False
 
      # store data
      trans = self.conn.begin()
-     self.engine.execute(self.source_table.insert(), sources)
+     self.engine.execute(self.source_table.insert(), sources_save)
      self.engine.execute(self.inventory_table.insert(), data)
      trans.commit()
      return True
+
+   def cleanup(self, timestamp):
+     pass
 
    def disconnect(self):
      self.conn.close()

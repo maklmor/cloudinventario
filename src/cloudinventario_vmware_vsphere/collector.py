@@ -54,20 +54,19 @@ class CloudCollectorVMWareVSphere(CloudCollector):
             logging.debug("new network name={}".format(net.name))
             self.networks[net.key] = net.name
           else:
-            logging.error("bad network name={}".format(net.name))
+            logging.error("bad network name={}".format(net.name))	# TODO: handle this !
 
     # collect hosts
     logging.info("collecting clusters")
     for child in content.rootFolder.childEntity:
       if hasattr(child, 'hostFolder'):
-        print(child.hostFolder)
         for cluster in child.hostFolder.childEntity:
           if isinstance(cluster, vim.ComputeResource):
             recs = self.__process_cluster(cluster)
             if recs:
               res.extend(recs)
           else:
-            print("BAD COMPUTE RESOURCE>>>", cluster.name, cluster)
+            logging.error("bad compute resource name={}".format(cluster.name))
 
     # collect VMs
     logging.info("collecting VApps and VMs")
