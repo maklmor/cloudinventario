@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import sys, argparse, logging
+import sys, argparse, logging, yaml
 from pprint import pprint
 
 sys.path.append('src');
@@ -7,14 +7,25 @@ from cloudinventario.cloudinventario import CloudInventario
 
 def getArgs():
    parser = argparse.ArgumentParser(description='CloudInventory args')
-   #parser.add_argument('-c', '--config', action='store',
-   #                    help='Config file')
+   parser.add_argument('-c', '--config', action='store', required=True,
+                       help='Config file')
+   parser.add_argument('-l', '--list', action='store_true',
+                       help='List collectors')
    parser.add_argument('-n', '--name', action='store',
-                       help='Collector name')
+                       help='Collector to run')
+   parser.add_argument('-a', '--all', action='store_true',
+                       help='Run all collectors')
+   parser.add_argument('-u', '--update-all', action='store', default=30,
+                       help='Update all collectors with old data')
    parser.add_argument('-v', '--verbose', action='count', default=0,
                        help='Verbose')
    args = parser.parse_args()
    return args
+
+def loadConfig(config_file):
+   with open(config_file) as file:
+       return yaml.safe_load(file)
+   return None
 
 def main():
   args = getArgs()
@@ -27,9 +38,28 @@ def main():
     level = logging.INFO
   logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=level)
 
-  # TODO: parse config here !
-  cinv = CloudInventario("config.yaml")
-  res = cinv.collect(args.name)
-  cinv.store()
+  # parse config
+  config = loadConfig(args.config)
+  cinv = CloudInventario(config)
 
+  if args.list:
+    for col in cinv.collectors:
+      print("{}".format(col))
+    return 0
+  elif args.name:
+    cinv.collect(args.name)
+    cinv.store()
+    return 0
+  elif args.all:
+    for col in cinv.collectors:
+      logging.info("collector name={}".format(col))
+      cinv.collect(col)
+      cinv.store()
+      cinv.clear()
+    return 0
+  else:
+    print("No action specified !", file=sys.stderr)
+    return 1
+
+# MAIN
 sys.exit(main())

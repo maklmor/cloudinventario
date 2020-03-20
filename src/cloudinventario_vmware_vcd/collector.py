@@ -10,13 +10,13 @@ from pyvcloud.vcd.utils import to_dict, vapp_to_dict, vm_to_dict
 
 from cloudinventario.helpers import CloudCollector
 
-def setup(name, config, options):
-  return CloudCollectorVMWareVCD(name, config, options)
+def setup(name, config, defaults, options):
+  return CloudCollectorVMWareVCD(name, config, defaults, options)
 
 class CloudCollectorVMWareVCD(CloudCollector):
 
-  def __init__(self, name, config, options):
-    super().__init__(name, config, options)
+  def __init__(self, name, config, defaults, options):
+    super().__init__(name, config, defaults, options)
 
     self.client = None
     self.org = None
@@ -107,6 +107,7 @@ class CloudCollectorVMWareVCD(CloudCollector):
 
     # process VMs
     disk_re = re.compile("^disk-")
+    nic_re = re.compile("^nic-")
     resource_type = vcd.ResourceType.VM.value
     vm_list = vdc.list_vapp_details(resource_type, 'containerName==' + vapp_name)
     for vm_def in vm_list:
@@ -117,6 +118,17 @@ class CloudCollectorVMWareVCD(CloudCollector):
 
       rec_detail = self.__process_vm(org_name, vdc_name, vapp_name, vm_name, vdc, vapp, vm)
       rec = {**rec, **rec_detail}
+
+      networks = []
+      for key in list(filter(nic_re.match, rec.keys())):
+        networks.append({
+          "name": key,
+          "mac": rec[key].get("mac"),
+          "ip": rec[key].get("ip"),
+          "network": rec[key].get("network")
+        })
+      if len(networks) > 0:
+        rec["networks"] = networks
 
       logging.debug("new VM name={}".format(rec["name"]))
       res.append(self.new_record('vm', {
@@ -129,13 +141,14 @@ class CloudCollectorVMWareVCD(CloudCollector):
         "memory": int(rec.get("memoryMB") or 0),
         "disks": len(list(filter(disk_re.match, rec.keys()))),
         "storage": sum(int(rec[key]["size-MB"]) for key in list(filter(disk_re.match, rec.keys()))),
-        "primary_ip": rec["ipAddress"],
-        "networks": None,	# TODO !!!
+        "primary_ip": rec.get("ipAddress"),
+        "networks": rec.get("networks"),
         "os": rec["guestOs"],
         "status": rec["status"],
         "is_on": (vm.is_powered_on() and 1 or 0),
         "owner": rec["ownerName"]
       }, rec))
+
     return res
 
   def __process_vm(self, org_name, vdc_name, vapp_name, vm_name, vdc, vapp, vm):

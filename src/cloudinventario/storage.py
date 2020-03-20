@@ -54,6 +54,7 @@ class InventoryStorage:
        sa.Column('type', sa.String),
        sa.Column('name', sa.String),
        sa.Column('project', sa.String),
+       sa.Column('location', sa.String),
        sa.Column('id', sa.String),
        sa.Column('created', sa.String),
 

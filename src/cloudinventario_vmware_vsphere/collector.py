@@ -7,13 +7,13 @@ from pyVmomi import vim
 
 from cloudinventario.helpers import CloudCollector
 
-def setup(name, config, options):
-  return CloudCollectorVMWareVSphere(name, config, options)
+def setup(name, config, defaults, options):
+  return CloudCollectorVMWareVSphere(name, config, defaults, options)
 
 class CloudCollectorVMWareVSphere(CloudCollector):
 
-  def __init__(self, name, config, options):
-    super().__init__(name, config, options)
+  def __init__(self, name, config, defaults, options):
+    super().__init__(name, config, defaults, options)
 
     self.client = None
     self.maxDepth = 10
@@ -135,6 +135,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       "sw_name": hp.name,
       "sw_vendor": hp.vendor,
       "sw_version": hp.version,
+      "cluster": host.parent.name,
       "storage": None,
       "networks": None,
     }
@@ -150,8 +151,8 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     for nic in host.config.network.pnic:
       networks.append({
         "name": nic.device,
-        "macAddress": nic.mac,
-        "ipAddress": nic.spec.ip.ipAddress
+        "mac": nic.mac,
+        "ip": nic.spec.ip.ipAddress
       })
     if len(networks) > 0:
       rec["networks"] = networks
@@ -163,9 +164,10 @@ class CloudCollectorVMWareVSphere(CloudCollector):
         "cpus": int(rec.get("cpus") or 0),
         "memory": int(rec.get("memory") or 0),
         "storage": int(rec.get("storage") or 0),
-        "primary_ip": rec["management_ip"],
+        "primary_ip": None,
+        "management_ip": rec["management_ip"],
         "networks": rec["networks"],
-        "os": rec["sw_name"],
+        "os": rec["os"],
         "status": rec["status"],
         "is_on": rec["is_on"],
     }, rec))
@@ -265,7 +267,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
           netname = vdb.deviceName
         elif hasattr(vdb, "port"):
           netname = self.networks.get(vdb.port.portgroupKey)
-        networks.append({ "macAddress": vd.macAddress, "network": netname })
+        networks.append({ "mac": vd.macAddress, "network": netname })
     if len(networks) > 0:
       rec["networks"] = networks
 

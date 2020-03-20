@@ -7,9 +7,10 @@ import cloudinventario.platform as platform
 class CloudCollector:
   """Cloud collector."""
 
-  def __init__(self, name, config, options):
+  def __init__(self, name, config, defaults, options):
     self.name = name
     self.config = config
+    self.defaults = defaults
     self.options = options
     self.allow_self_signed = options.get('allow_self_signed', config.get('allow_self_signed', False))
     if self.allow_self_signed:
@@ -53,11 +54,13 @@ class CloudCollector:
       self.__post_request()
 
   def new_record(self, rectype, attrs, details):
-    attr_keys = ["created", "name", "project", "description", "id",
+    attr_keys = ["created", "name", "project", "location", "description", "id",
                  "cpus", "memory", "disks", "storage", "primary_ip",
                  "os", "os_family",
                  "status", "is_on",
                  "owner", "tags"]
+    attrs = {**self.defaults, **attrs}
+
     attr_json_keys = [ "networks" ]
     rec = {
       "type": rectype,

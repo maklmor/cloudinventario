@@ -1,5 +1,5 @@
 """CloudInventario"""
-import yaml, sys, importlib, re
+import sys, importlib, re
 from pprint import pprint
 
 from cloudinventario.storage import InventoryStorage
@@ -8,17 +8,18 @@ COLLECTOR_PREFIX = 'cloudinventario'
 
 class CloudInventario:
 
-   def __init__(self, config_file):
-     self.config = self.load_config(config_file)
+   def __init__(self, config):
+     self.config = config
      self._inventory = []
-
-   def load_config(self, config_file):
-     with open(config_file) as file:
-       return yaml.safe_load(file)
 
    @property
    def collectors(self):
      return self.config['collectors'].keys()
+
+   @ property
+   def expiredCollectors(self):
+     # TODO
+     pass
 
    def collectorConfig(self, collector):
      return self.config['collectors'][collector]
@@ -32,7 +33,7 @@ class CloudInventario:
      mod_name = re.sub(r'-', '_', mod_name)
 
      mod = importlib.import_module(COLLECTOR_PREFIX + '_' + mod_name + '.collector')
-     mod_instance = mod.setup(collector, mod_cfg['config'], options or {})
+     mod_instance = mod.setup(collector, mod_cfg['config'], mod_cfg.get('default', {}), options or {})
      return mod_instance
 
    def collect(self, collector):
@@ -45,8 +46,12 @@ class CloudInventario:
      return True
 
    @property
-   def inventory():
+   def inventory(self):
      return self._inventory
+
+   def clear(self):
+     self._inventory = []
+     return True
 
    def store(self):
      store_config = self.config["storage"]
