@@ -7,6 +7,9 @@ from pyVmomi import vim
 
 from cloudinventario.helpers import CloudCollector
 
+# TEST mode enabled (limits number of fetched items)
+TEST = 0
+
 def setup(name, config, defaults, options):
   return CloudCollectorVMWareVSphere(name, config, defaults, options)
 
@@ -65,6 +68,8 @@ class CloudCollectorVMWareVSphere(CloudCollector):
             recs = self.__process_cluster(cluster)
             if recs:
               res.extend(recs)
+            if TEST:
+              break
           else:
             logging.error("bad compute resource name={}".format(cluster.name))
 
@@ -104,6 +109,8 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     logging.info("collecting cluster hosts")
     for host in cluster.host:
       res.extend(self.__process_host(host))
+      if TEST:
+        break
     return res
 
   def __process_host(self, host):
@@ -160,6 +167,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     res = []
     res.append(self.new_record("server", {
         "name": rec["name"],
+        "project": rec["cluster"],
         "id": rec["id"],
         "cpus": int(rec.get("cpus") or 0),
         "memory": int(rec.get("memory") or 0),
@@ -183,6 +191,8 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       res = []
       for c in child.childEntity:
         res.extend(self.__process_vmchild(c, depth + 1))
+        if TEST:
+          break
       return res
 
     # if this is a vApp, it likely contains child VMs
@@ -193,6 +203,8 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       res = []
       for c in vmList:
         res.extend(self.__process_vmchild(c, depth + 1))
+        if TEST:
+          break
       return res
 
     res = []
@@ -235,13 +247,15 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       "instanceUUID": vs.config.instanceUuid,
       "UUID": vs.config.uuid,
       "storage": None,
-      "primary_ip": vs.guest.ipAddress,
+      "primary_ip": ((vs.guest.ipAddress and ":" not in vs.guest.ipAddress) and vs.guest.ipAddress or None), # no ipv6 here
       "status": vs.runtime.powerState,
       "is_on": (vs.runtime.powerState == "poweredOn" and 1 or 0),
       "host": vs.runtime.host.name,
       "project": vm.parent.name,
       "vapp": vm.parent.name,
       "datastore": [ ds.datastore.name for ds in vm.storage.perDatastoreUsage ],
+      "cluster": vs.runtime.host.parent.name,
+      #"management_ip": vs.runtime.host.parent.summary.managementServerIp	# TODO: need this
       #"tags": vm.tags,
     }
 
@@ -255,19 +269,23 @@ class CloudCollectorVMWareVSphere(CloudCollector):
 
     # networks
     networks = []
-    for vd in vm.config.hardware.device:
-      if isinstance(vd, vim.VirtualEthernetCard):
-        netname = None
-        vdb = vd.backing
-        if hasattr(vdb, "network"):
-          netname = vdb.network
-        elif hasattr(vdb, "opaqueNetworkId"):
-          netname = vdb.opaqueNetworkId
-        elif hasattr(vdb, "deviceName"):
-          netname = vdb.deviceName
-        elif hasattr(vdb, "port"):
-          netname = self.networks.get(vdb.port.portgroupKey)
-        networks.append({ "mac": vd.macAddress, "network": netname })
+    for nic in vm.guest.net:
+      net = { "mac": nic.macAddress, "network": nic.network,
+        "ip": None, "connected": nic.connected
+         }
+      for ip in nic.ipConfig.ipAddress:
+        if not net["ip"] and ip.prefixLength <= 32:	# DUMMY distinguish IPv4 address
+          net["ip"] = ip.ipAddress
+          net["prefix"] = ip.prefixLength
+          if not rec["primary_ip"]:
+            rec["primary_ip"] = net["ip"]
+        else:
+          if not net.get("aliases"):
+            net["aliases"] = []
+          net["aliases"].append(ip.ipAddress + "/" + str(ip.prefixLength))
+      if net["ip"] == rec["primary_ip"]:
+        net["primary"] = True
+      networks.append(net)
     if len(networks) > 0:
       rec["networks"] = networks
 
@@ -282,7 +300,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       "disks": int(rec.get("disks") or 0),
       "storage": int(rec.get("storage") or 0),
       "primary_ip": rec["primary_ip"],
-      "networks": rec["networks"],
+      "networks": rec.get("networks"),
       "os": rec["os"],
       "status": rec["status"],
       "is_on": rec["is_on"]

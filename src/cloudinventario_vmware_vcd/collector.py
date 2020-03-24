@@ -10,6 +10,9 @@ from pyvcloud.vcd.utils import to_dict, vapp_to_dict, vm_to_dict
 
 from cloudinventario.helpers import CloudCollector
 
+# TEST MODE
+TEST = 0
+
 def setup(name, config, defaults, options):
   return CloudCollectorVMWareVCD(name, config, defaults, options)
 
@@ -78,6 +81,8 @@ class CloudCollectorVMWareVCD(CloudCollector):
       vapp_res = vdc.get_vapp(vapp_name)
       vapp = vcdVApp(self.client, resource=vapp_res)
       res.extend(self.__process_vapp(org_name, vdc_name, vapp_name, vdc, vapp))
+      if TEST:
+        break
     return res
 
   def __process_vapp(self, org_name, vdc_name, vapp_name, vdc, vapp):
@@ -109,7 +114,12 @@ class CloudCollectorVMWareVCD(CloudCollector):
     disk_re = re.compile("^disk-")
     nic_re = re.compile("^nic-")
     resource_type = vcd.ResourceType.VM.value
-    vm_list = vdc.list_vapp_details(resource_type, 'containerName==' + vapp_name)
+    try:
+      vm_list = vdc.list_vapp_details(resource_type, 'containerName==' + vapp_name)
+    except:
+      logging.error("failed to get VM list for vapp={}".format(vapp_name))
+      return [res]
+
     for vm_def in vm_list:
       rec = to_dict(vm_def, resource_type=resource_type)
       vm_name = rec["name"]
@@ -121,12 +131,16 @@ class CloudCollectorVMWareVCD(CloudCollector):
 
       networks = []
       for key in list(filter(nic_re.match, rec.keys())):
-        networks.append({
+        net = {
           "name": key,
           "mac": rec[key].get("mac"),
           "ip": rec[key].get("ip"),
-          "network": rec[key].get("network")
-        })
+          "network": rec[key].get("network"),
+          "connected": (rec[key].get("connected") == "true" and True or False)
+        }
+        if net["ip"] == rec.get("ipAddress"):
+          net["primary"] = True
+        networks.append(net)
       if len(networks) > 0:
         rec["networks"] = networks
 
