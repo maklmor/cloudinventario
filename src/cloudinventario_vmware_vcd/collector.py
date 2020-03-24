@@ -130,6 +130,7 @@ class CloudCollectorVMWareVCD(CloudCollector):
       rec = {**rec, **rec_detail}
 
       networks = []
+      primary_ip = rec.get("ipAddress")
       for key in list(filter(nic_re.match, rec.keys())):
         net = {
           "name": key,
@@ -140,6 +141,8 @@ class CloudCollectorVMWareVCD(CloudCollector):
         }
         if net["ip"] == rec.get("ipAddress"):
           net["primary"] = True
+        if key == rec.get('primary-nic'):
+          primary_ip = net["ip"]
         networks.append(net)
       if len(networks) > 0:
         rec["networks"] = networks
@@ -148,6 +151,7 @@ class CloudCollectorVMWareVCD(CloudCollector):
       res.append(self.new_record('vm', {
         "created": rec["DateCreated"],
         "name": rec["name"],
+        "cluster": rec["vdcName"],
         "project": rec["vappName"],
         "description": rec["Description"],
         "id": rec["id"],
@@ -155,7 +159,7 @@ class CloudCollectorVMWareVCD(CloudCollector):
         "memory": int(rec.get("memoryMB") or 0),
         "disks": len(list(filter(disk_re.match, rec.keys()))),
         "storage": sum(int(rec[key]["size-MB"]) for key in list(filter(disk_re.match, rec.keys()))),
-        "primary_ip": rec.get("ipAddress"),
+        "primary_ip": primary_ip,
         "networks": rec.get("networks"),
         "os": rec["guestOs"],
         "status": rec["status"],

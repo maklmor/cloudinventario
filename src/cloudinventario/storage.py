@@ -23,17 +23,7 @@ class InventoryStorage:
 
    def __check_schema(self):
      return False
-#     table_re = re.compile('^' + TABLE_PREFIX + '_')
-#     tables_all = sa.inspect(self.engine).get_table_names()
-#     tables = list(filter(table_re.match, tables_all))
-#     return len(tables) > 0
 
-#    attr_keys = ["created", "name", "project", "description", "id",
-#                 "cpus", "memory", "disks", "storage", "primary_ip",
-#                 "os", "os_family",
-#                 "status", "is_on",
-#                 "owner", "tags"]
-#    attr_json_keys = [ "networks" ]
    def __create_schema(self):
      meta = sa.MetaData()
      self.source_table = sa.Table(TABLE_PREFIX + 'source', meta,
@@ -53,6 +43,7 @@ class InventoryStorage:
        sa.Column('source', sa.String),
        sa.Column('type', sa.String),
        sa.Column('name', sa.String),
+       sa.Column('cluster', sa.String),
        sa.Column('project', sa.String),
        sa.Column('location', sa.String),
        sa.Column('id', sa.String),
@@ -80,7 +71,7 @@ class InventoryStorage:
        sa.Column('attributes', sa.Text),
        sa.Column('details', sa.Text),
 
-       sa.UniqueConstraint('version', 'source', 'type', 'name', 'project', 'id')
+       sa.UniqueConstraint('version', 'source', 'type', 'name', "cluster", 'project', 'id')
      )
 
      meta.create_all(self.engine, checkfirst = True)

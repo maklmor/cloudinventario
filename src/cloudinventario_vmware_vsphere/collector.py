@@ -292,6 +292,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     res = []
     res.append(self.new_record('vm', {
       "name": rec["name"],
+      "cluster": rec["cluster"],
       "project": rec["vapp"],
       "description": rec["description"],
       "id": rec["id"],

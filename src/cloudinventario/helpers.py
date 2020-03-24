@@ -54,7 +54,8 @@ class CloudCollector:
       self.__post_request()
 
   def new_record(self, rectype, attrs, details):
-    attr_keys = ["created", "name", "project", "location", "description", "id",
+    attr_keys = ["created",
+                 "name", "cluster", "project", "location", "description", "id",
                  "cpus", "memory", "disks", "storage", "primary_ip",
                  "os", "os_family",
                  "status", "is_on",
