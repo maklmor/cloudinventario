@@ -66,6 +66,7 @@ class InventoryStorage:
        sa.Column('tags', sa.String),
 
        sa.Column('networks', sa.String),
+       sa.Column('storages', sa.String),
 
        sa.Column('description', sa.String),
        sa.Column('attributes', sa.Text),

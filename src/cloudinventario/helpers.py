@@ -62,7 +62,7 @@ class CloudCollector:
                  "owner", "tags"]
     attrs = {**self.defaults, **attrs}
 
-    attr_json_keys = [ "networks" ]
+    attr_json_keys = [ "networks", "storages" ]
     rec = {
       "type": rectype,
       "source": self.name,

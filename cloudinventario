@@ -53,9 +53,11 @@ def main():
   elif args.all:
     for col in cinv.collectors:
       logging.info("collector name={}".format(col))
-      cinv.collect(col)
-      cinv.store()
-      cinv.clear()
+      if cinv.collect(col):
+        cinv.store()
+        cinv.clear()
+      else:
+        logging.info("collector failed name={}".format(col))
     return 0
   else:
     print("No action specified !", file=sys.stderr)

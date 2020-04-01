@@ -39,11 +39,12 @@ class CloudInventario:
    def collect(self, collector):
      instance = self.loadCollector(collector)
 
-     instance.login()
-     self._inventory = instance.fetch()
-     instance.logout()
+     if instance.login():
+       self._inventory = instance.fetch()
+       instance.logout()
+       return True
 
-     return True
+     return False
 
    @property
    def inventory(self):
