@@ -32,11 +32,15 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       if hasattr(ssl, '_create_unverified_context'):
         context = ssl._create_unverified_context()
     logging.info("logging in host={}, user={}".format(host, user))
-    self.client = SmartConnect(host=host,
+    try:
+      self.client = SmartConnect(host=host,
                                user=user,
                                pwd=passwd,
                                port=port,
                                sslContext=context)
+    except:
+      logging.error("failed to log in to host={}".format(host))
+      return False
     if not self.client:
       return False
     logging.info("logged in")
@@ -122,12 +126,16 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     logging.debug("new server name={}".format(name))
     hs = host.summary
     hp = hs.config.product
+    hcpu = host.hardware.cpuPkg[0]
     rec = {
       "name": name,
       "id": host._moId,
       "management_ip": hs.managementServerIp,
+      "primary_ip": None,
       "memory": hs.hardware.memorySize // (1024 * 1024),
       "cpus": hs.hardware.numCpuCores,
+      "cpu_vendor": hcpu.vendor,
+      "cpu_description": hcpu.description,
       "threads": hs.hardware.numCpuThreads,
       "nics": hs.hardware.numNics,
       "UUID": hs.hardware.uuid,
@@ -145,22 +153,49 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       "cluster": host.parent.name,
       "storage": None,
       "networks": None,
+      "storages": None
     }
 
+    # storage
     storage = 0
+    storage_free = 0
+    datastore = []
     for ds in host.datastore:
       storage += ds.summary.capacity
+      storage_free += ds.summary.freeSpace
+      info = {
+        "name": ds.summary.name,
+        "capacity": ds.summary.capacity // (1024 * 1024),
+        "free_space": ds.summary.freeSpace // (1024 * 1024),
+        "ssd": None
+      }
+      if hasattr(ds.info, 'vmfs'):
+        info["ssd"] = ds.info.vmfs.ssd
+      datastore.append(info)
     if storage > 0:
       rec["storage"] = storage // (1024 * 1024)
+      rec["storages"] = datastore
 
-    # networks
+    # networks (
     networks = []
+    netdevinfo = {}
+    for nic in host.config.network.vnic:
+      netdevinfo[nic.spec.mac] = {
+        "ip": nic.spec.ip.ipAddress or None,
+        "subnet": nic.spec.ip.subnetMask or None
+      }
     for nic in host.config.network.pnic:
-      networks.append({
+      net = {
         "name": nic.device,
         "mac": nic.mac,
-        "ip": nic.spec.ip.ipAddress
-      })
+        "ip": netdevinfo.get(nic.mac, {}).get("ip") or (nic.spec.ip.ipAddress or None),
+        "subnet": netdevinfo.get(nic.mac, {}).get("subnet")
+      }
+      if not rec["primary_ip"]:
+         rec["primary_ip"] = net["ip"]
+      if net["ip"] and net["ip"] == rec["primary_ip"]:
+        net["primary"] = True
+      networks.append(net)
     if len(networks) > 0:
       rec["networks"] = networks
 
@@ -172,7 +207,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
         "cpus": int(rec.get("cpus") or 0),
         "memory": int(rec.get("memory") or 0),
         "storage": int(rec.get("storage") or 0),
-        "primary_ip": None,
+        "primary_ip": rec["primary_ip"],
         "management_ip": rec["management_ip"],
         "networks": rec["networks"],
         "os": rec["os"],
@@ -283,7 +318,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
           if not net.get("aliases"):
             net["aliases"] = []
           net["aliases"].append(ip.ipAddress + "/" + str(ip.prefixLength))
-      if net["ip"] == rec["primary_ip"]:
+      if net["ip"] and net["ip"] == rec["primary_ip"]:
         net["primary"] = True
       networks.append(net)
     if len(networks) > 0:
