@@ -68,6 +68,7 @@ class CloudCollector:
       "source": self.name,
       "attributes": None
     }
+
     for key in attr_keys:
       if not attrs.get(key):
         rec[key] = None
@@ -84,6 +85,9 @@ class CloudCollector:
 
     if "os_family" not in attrs.keys() and rec.get("os"):
       rec["os_family"] = platform.get_os_family(rec.get("os"), rec.get("description"))
+
+    if rec.get("os"):
+      rec["os"] = platform.get_os(rec.get("os"), rec.get("description"))
 
     if len(attrs) > 0:
       rec["attributes"] = json.dumps(attrs)

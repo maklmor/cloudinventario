@@ -23,3 +23,8 @@ def get_os_family(str, desc = None):
     return OS_VMWARE
   else:
     return OS_OTHER
+
+def get_os(str, desc = None):
+  if re_linux.match(str) and desc and re_routeros.match(desc):
+      return "RouterOS/Linux"
+  return str

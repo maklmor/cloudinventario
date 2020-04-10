@@ -80,6 +80,8 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     # collect VMs
     logging.info("collecting VApps and VMs")
     for child in content.rootFolder.childEntity:
+      #print("child = {}".format(child.name))
+
       if hasattr(child, 'vmFolder'):
         datacenter = child
         vmFolder = datacenter.vmFolder
@@ -216,16 +218,25 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     }, rec))
     return res
 
-  def __process_vmchild(self, child, depth = 1):
+  def __process_vmchild(self, child, depth = 1, prefix = None):
+
+    res = []
+    if isinstance(child, vim.Folder) or isinstance(child, vim.VirtualApp):
+      if prefix == None:
+        prefix = child.name
+      else:
+        prefix = prefix + '.' + child.name
+      res.extend(self.__process_vapp(child, prefix))
+    #print("vmchild = {}/{}".format(child.name, type(child).__name__))
+
     # if this is a group it will have children. if it does, recurse into them
     # and then return
     if hasattr(child, 'childEntity'):
       if depth > self.maxDepth:
         return []
 
-      res = []
       for c in child.childEntity:
-        res.extend(self.__process_vmchild(c, depth + 1))
+        res.extend(self.__process_vmchild(c, depth + 1, prefix))
         if TEST:
           break
       return res
@@ -235,26 +246,28 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     if isinstance(child, vim.VirtualApp):
       vmList = vm.vm
 
-      res = []
+      res.extend(self.__process_vapp(child, prefix))
+
       for c in vmList:
-        res.extend(self.__process_vmchild(c, depth + 1))
+        res.extend(self.__process_vmchild(c, depth + 1, prefix))
         if TEST:
           break
       return res
 
-    res = []
     if isinstance(child, vim.VirtualMachine):
-      res.extend(self.__process_vm(child))
+      res.extend(self.__process_vm(child, prefix))
     return res
 
-  def __process_vapp(self, vapp):
-    name = vapp.name
+  def __process_vapp(self, vapp, name):
     logging.debug("new vapp name={}".format(name))
-    vs = vapp.summary
+
+    vs = None
+    if isinstance(vapp, vim.VirtualApp):
+      vs = vapp.summary
     rec = {
       "name": name,
       "id": vapp._moId,
-      "memory": vs.configuredMemoryMB
+      "memory": (vs and vs.configuredMemoryMB or 0)
     }
 
     res = []
@@ -265,7 +278,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     }, rec))
     return res
 
-  def __process_vm(self, vm):
+  def __process_vm(self, vm, parent):
     name = vm.name
     logging.debug("new vm name={}".format(name))
     vs = vm.summary
@@ -286,8 +299,8 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       "status": vs.runtime.powerState,
       "is_on": (vs.runtime.powerState == "poweredOn" and 1 or 0),
       "host": vs.runtime.host.name,
-      "project": vm.parent.name,
-      "vapp": vm.parent.name,
+      "project": parent,
+      "vapp": parent,
       "datastore": [ ds.datastore.name for ds in vm.storage.perDatastoreUsage ],
       "cluster": vs.runtime.host.parent.name,
       #"management_ip": vs.runtime.host.parent.summary.managementServerIp	# TODO: need this

@@ -88,7 +88,7 @@ class InventoryStorage:
                    sa.func.max(self.source_table.c.version).label("version")])
      	        .group_by(self.source_table.c.source))
      res = res.fetchall()
-     if res and res[0]["source"]:
+     if res and res[0]["version"]:
        sources = [dict(row) for row in res]
      else:
        sources = []

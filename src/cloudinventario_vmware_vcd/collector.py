@@ -99,6 +99,7 @@ class CloudCollectorVMWareVCD(CloudCollector):
     res.append(self.new_record('vapp', {
       "created": rec["creationDate"],
       "name": rec["name"],
+      "id": rec["name"],	# TODO: should be smth. better
       "project": rec["vdcName"],
       "cpus": int(rec.get("numberOfCpus") or 0),
       "memory": int(rec.get("memoryAllocationMB") or 0),
