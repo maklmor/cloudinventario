@@ -1,2 +1,10 @@
 __pycache__
-config.xml
+config.yaml
+bin/
+include/
+lib/
+lib64
+share/
+pyvenv.cfg
+*.log
+*.db
