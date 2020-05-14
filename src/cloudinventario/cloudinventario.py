@@ -1,5 +1,5 @@
 """CloudInventario"""
-import sys, importlib, re
+import os, sys, importlib, re
 from pprint import pprint
 
 from cloudinventario.storage import InventoryStorage
@@ -39,10 +39,19 @@ class CloudInventario:
    def collect(self, collector):
      instance = self.loadCollector(collector)
 
-     if instance.login():
-       self._inventory = instance.fetch()
-       instance.logout()
-       return True
+     # workaround for buggy libs
+     wd = os.getcwd()
+     os.chdir("/tmp")
+
+     try:
+       if instance.login():
+         self._inventory = instance.fetch()
+         instance.logout()
+         os.chdir(wd)
+
+         return True
+     finally:
+       os.chdir(wd)
 
      return False
 
@@ -63,3 +72,11 @@ class CloudInventario:
      store.disconnect()
 
      return True
+
+   def cleanup(self, days):
+     store_config = self.config["storage"]
+     store = InventoryStorage(store_config)
+
+     store.connect()
+     store.cleanup(days)
+     store.disconnect()

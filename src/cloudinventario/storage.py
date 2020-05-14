@@ -1,5 +1,6 @@
 import logging, re
 from pprint import pprint
+from datetime import datetime, timedelta
 
 import sqlalchemy as sa
 
@@ -81,7 +82,7 @@ class InventoryStorage:
    def __prepare(self):
      pass
 
-   def save(self, data):
+   def __get_source_version_max(self):
      # get active version
      res = self.conn.execute(sa.select([
                    self.source_table.c.source,
@@ -92,6 +93,10 @@ class InventoryStorage:
        sources = [dict(row) for row in res]
      else:
        sources = []
+     return sources
+
+   def save(self, data):
+     sources = self.__get_source_version_max()
 
      # increment versions
      versions = {}
@@ -128,7 +133,25 @@ class InventoryStorage:
      trans.commit()
      return True
 
-   def cleanup(self, timestamp):
+   def cleanup(self, days):
+     res = self.conn.execute(sa.select([
+                   self.source_table.c.source,
+                   self.source_table.c.version])
+		.where(self.source_table.c.ts <= datetime.today() - timedelta(days=days)))
+     res = res.fetchall()
+
+     trans = self.conn.begin()
+     for row in res:
+       logging.debug("prune: source={}, version={}".format(row["source"], row["version"]))
+       self.engine.execute(self.inventory_table.delete().where(
+             (self.inventory_table.c.source == row["source"]) &
+                (self.inventory_table.c.version == row["version"])
+         ))
+       self.engine.execute(self.source_table.delete().where(
+             (self.source_table.c.source == row["source"]) &
+                (self.source_table.c.version == row["version"])
+         ))
+     trans.commit()
      pass
 
    def disconnect(self):
