@@ -37,23 +37,22 @@ class CloudInventario:
      return mod_instance
 
    def collect(self, collector):
-     instance = self.loadCollector(collector)
-
      # workaround for buggy libs
      wd = os.getcwd()
      os.chdir("/tmp")
 
+     ret = False
      try:
+       instance = self.loadCollector(collector)
+
        if instance.login():
          self._inventory = instance.fetch()
          instance.logout()
-         os.chdir(wd)
-
-         return True
+         ret = True
      finally:
        os.chdir(wd)
 
-     return False
+     return ret
 
    @property
    def inventory(self):
