@@ -1,4 +1,4 @@
-import logging, re
+import logging, re, sys
 from pprint import pprint
 
 import pyvcloud.vcd.client as vcd
@@ -6,7 +6,7 @@ from pyvcloud.vcd.org import Org as vcdOrg
 from pyvcloud.vcd.vdc import VDC as vcdVDC
 from pyvcloud.vcd.vapp import VApp as vcdVApp
 from pyvcloud.vcd.vapp import VM as vcdVM
-from pyvcloud.vcd.utils import to_dict, vapp_to_dict, vm_to_dict
+from pyvcloud.vcd.utils import to_dict, vapp_to_dict, vm_to_dict, stdout_xml
 
 from cloudinventario.helpers import CloudCollector
 
@@ -35,10 +35,10 @@ class CloudCollectorVMWareVCD(CloudCollector):
     logging.info("logging in host={}".format(host))
     self.client = vcd.Client(host, api_version = '29.0',
                              verify_ssl_certs = self.verify_ssl,
-                             log_file='/dev/null',
+                             log_file='log',
                              log_requests=False,
                              log_headers=False,
-                             log_bodies=False)
+                             log_bodies=True)
 
     # suppress logging
     for name in ['urllib3.connectionpool', 'vcd_pysdk.log']:
@@ -75,6 +75,13 @@ class CloudCollectorVMWareVCD(CloudCollector):
 
   def __process_vdc(self, org_name, vdc_name, vdc):
     res = []
+
+#    dat = self.client.get_resource('https://vdc.cloud.telekom.ro/api/org/96f732d7-9d7a-4984-b572-49c0a27f6ab3/vdcRollup')
+#    dat = dat.AllocationPoolVdcSummary.MemoryConsumptionMB;
+#    pprint(dat)
+#    sys.exit(0)
+
+
     res_list = vdc.list_resources(vcd.EntityType.VAPP)
     for vapp_def in res_list:
       vapp_name = vapp_def["name"]
@@ -134,7 +141,8 @@ class CloudCollectorVMWareVCD(CloudCollector):
       primary_ip = rec.get("ipAddress")
       for key in list(filter(nic_re.match, rec.keys())):
         net = {
-          "name": key,
+          "id": key,
+          "name": rec[key].get("name") or key,
           "mac": rec[key].get("mac"),
           "ip": rec[key].get("ip"),
           "network": rec[key].get("network"),
@@ -148,6 +156,23 @@ class CloudCollectorVMWareVCD(CloudCollector):
       if len(networks) > 0:
         rec["networks"] = networks
 
+      storages = []
+      storage_size = 0
+      for key in list(filter(disk_re.match, rec.keys())):
+        storage_size += int(rec[key].get("size-MB"));
+        disk = {
+          "id": rec[key].get("id") or key,
+          "name": rec[key].get("name") or key,
+          "capacity": int(rec[key].get("size-MB") or 0),
+          "free": None,
+          "profile": rec[key].get("StorageProfile"),
+          "thin": rec[key].get("ThinProvisioned"),
+          "ssd": None
+        }
+        storages.append(disk)
+      if len(storages) > 0:
+        rec["storages"] = storages
+
       logging.debug("new VM name={}".format(rec["name"]))
       res.append(self.new_record('vm', {
         "created": rec["DateCreated"],
@@ -158,10 +183,11 @@ class CloudCollectorVMWareVCD(CloudCollector):
         "id": rec["id"],
         "cpus": int(rec.get("numberOfCpus") or 0),
         "memory": int(rec.get("memoryMB") or 0),
-        "disks": len(list(filter(disk_re.match, rec.keys()))),
-        "storage": sum(int(rec[key]["size-MB"]) for key in list(filter(disk_re.match, rec.keys()))),
+        "disks": len(storages),
+        "storage": storage_size, #sum(int(rec[key]["size-MB"]) for key in list(filter(disk_re.match, rec.keys()))),
         "primary_ip": primary_ip,
         "networks": rec.get("networks"),
+        "storages": rec.get("storages"),
         "os": rec["guestOs"],
         "status": rec["status"],
         "is_on": (vm.is_powered_on() and 1 or 0),
@@ -172,14 +198,32 @@ class CloudCollectorVMWareVCD(CloudCollector):
 
   def __process_vm(self, org_name, vdc_name, vapp_name, vm_name, vdc, vapp, vm):
     # VM details
-    rec = to_dict(vm.get_resource())
-    rec_detail = vm_to_dict(vm.get_resource())
+    vm.get_resource();
+    rec = to_dict(vm.resource)
+    rec_detail = vm_to_dict(vm.resource)
     rec = {**rec, **rec_detail}
+    # special handling for disks
+    for disk in vm.resource.VmSpecSection.DiskSection.DiskSettings:
+      rec_disk = to_dict(disk)
+      rec_disk["id"] = str(disk["DiskId"])
+      rec_disk_key = "disk-" + rec_disk["id"]
+      rec[rec_disk_key] = {**rec[rec_disk_key], **rec_disk}
+
     rec["orgName"] = org_name
     rec["vdcName"] = vdc_name
     rec["vappName"] = vapp_name
     rec["vapp"] = vapp_name
     return rec
+
+  def __to_dict(self, obj):
+    result = {}
+    if hasattr(obj, '__dict__') and len(obj.__dict__) > 0:
+       # XXX: not handling iterable objects (not possible without knowing struct)
+       for key in obj.__dict__:
+           result[ckey] = self.__to_dict(obj[key])
+    else:
+       return obj.text
+    return result
 
   def _logout(self):
     self.client.logout()
