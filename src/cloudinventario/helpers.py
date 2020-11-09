@@ -1,6 +1,7 @@
 """Classes used by CloudInventario."""
 import requests
 import json
+#from pprint import pprint
 
 import cloudinventario.platform as platform
 

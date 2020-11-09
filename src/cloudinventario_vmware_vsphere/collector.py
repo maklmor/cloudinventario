@@ -168,7 +168,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       info = {
         "name": ds.summary.name,
         "capacity": ds.summary.capacity // (1024 * 1024),
-        "free_space": ds.summary.freeSpace // (1024 * 1024),
+        "free": ds.summary.freeSpace // (1024 * 1024),
         "ssd": None
       }
       if hasattr(ds.info, 'vmfs'):

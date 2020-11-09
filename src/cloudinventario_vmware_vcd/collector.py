@@ -65,6 +65,12 @@ class CloudCollectorVMWareVCD(CloudCollector):
 
     res = []
     org_name = self.org.get_name()
+
+    rec = None
+    res.append(self.new_record('org', {
+      "name": org_name,
+    }, rec))
+
     for vdc_def in vdc_list:
       vdc_name = vdc_def["name"]
       vdc_res = self.org.get_vdc(vdc_name)
@@ -76,11 +82,14 @@ class CloudCollectorVMWareVCD(CloudCollector):
   def __process_vdc(self, org_name, vdc_name, vdc):
     res = []
 
-#    dat = self.client.get_resource('https://vdc.cloud.telekom.ro/api/org/96f732d7-9d7a-4984-b572-49c0a27f6ab3/vdcRollup')
-#    dat = dat.AllocationPoolVdcSummary.MemoryConsumptionMB;
-#    pprint(dat)
-#    sys.exit(0)
+    vdc.get_resource()
+    rec = self.__to_dict(vdc.resource);
 
+    res.append(self.new_record('vdc', {
+      "name": vdc_name,
+      "cluster": org_name,
+      "description": rec.get("description"),
+    }, rec))
 
     res_list = vdc.list_resources(vcd.EntityType.VAPP)
     for vapp_def in res_list:
@@ -107,6 +116,7 @@ class CloudCollectorVMWareVCD(CloudCollector):
       "created": rec["creationDate"],
       "name": rec["name"],
       "id": rec["name"],	# TODO: should be smth. better
+      "cluster": rec["vdcName"],
       "project": rec["vdcName"],
       "cpus": int(rec.get("numberOfCpus") or 0),
       "memory": int(rec.get("memoryAllocationMB") or 0),
@@ -220,7 +230,7 @@ class CloudCollectorVMWareVCD(CloudCollector):
     if hasattr(obj, '__dict__') and len(obj.__dict__) > 0:
        # XXX: not handling iterable objects (not possible without knowing struct)
        for key in obj.__dict__:
-           result[ckey] = self.__to_dict(obj[key])
+           result[key[0].lower() + key[1:]] = self.__to_dict(obj[key])
     else:
        return obj.text
     return result
