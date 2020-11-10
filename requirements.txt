@@ -1,5 +1,6 @@
 wheel
 pyaml
+setproctitle
 sqlalchemy
 sqlalchemy-pysqlite3
 pyvcloud

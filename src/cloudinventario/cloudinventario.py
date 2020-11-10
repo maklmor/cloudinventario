@@ -14,7 +14,11 @@ class CloudInventario:
 
    @property
    def collectors(self):
-     return self.config['collectors'].keys()
+     collectors = []
+     for col in self.config['collectors'].keys():
+        if self.config['collectors'][col].get("disabled") != True:
+          collectors.append(col)
+     return collectors
 
    @ property
    def expiredCollectors(self):

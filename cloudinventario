@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import concurrent.futures
-import os, sys, argparse, logging, yaml, asyncio
+import multiprocessing
+import os, sys, argparse, logging, yaml, asyncio, setproctitle
 from pprint import pprint
 
 DN = os.path.dirname(os.path.abspath(__file__))
@@ -39,6 +40,10 @@ def collect(data):
    config = data['config']
    name = data['name']
 
+   proctitle = setproctitle.getproctitle()
+   setproctitle.setproctitle("[cloudinventario] " + name)
+   multiprocessing.current_process().name = name
+
    cinv = CloudInventario(config)
 
    logging.info("collector name={}".format(name))
@@ -47,11 +52,13 @@ def collect(data):
      if inventory is not None:
         logging.info("storing data for name={}".format(name))
         cinv.store(inventory)
+        setproctitle.setproctitle(proctitle)
         return True
      else:
         logging.info("collector failed name={}".format(name))
    except Exception as e:
      logging.error("collector failed with exception", exc_info=e)
+   setproctitle.setproctitle(proctitle)
    return False
 
 # main
@@ -63,7 +70,7 @@ def main(args):
     level = logging.DEBUG
   elif args.verbose > 0:
     level = logging.INFO
-  logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=level)
+  logging.basicConfig(format='%(asctime)s [%(processName)s] [%(levelname)s] %(message)s', level=level)
 
   # parse config
   config = loadConfig(args.config)
