@@ -1,6 +1,7 @@
 import logging, re
 from pprint import pprint
 from datetime import datetime, timedelta
+from sqlalchemy.pool import NullPool
 
 import sqlalchemy as sa
 
@@ -11,12 +12,21 @@ class InventoryStorage:
    def __init__(self, config):
      self.config = config
      self.dsn = config["dsn"]
-     self.engine = sa.create_engine(self.dsn, echo=False)
+     self.engine = self.__create()
      self.conn = None
      self.version = 0
 
+   def __del__(self):
+     if self.conn:
+       self.disconnect()
+     self.engine.dispose()
+
+   def __create(self):
+     return sa.create_engine(self.dsn, echo=False, poolclass=NullPool)
+
    def connect(self):
      self.conn = self.engine.connect()
+     #self.conn.execution_options(autocommit=True)
      if not self.__check_schema():
        self.__create_schema()
      self.__prepare();
@@ -28,7 +38,7 @@ class InventoryStorage:
    def __create_schema(self):
      meta = sa.MetaData()
      self.source_table = sa.Table(TABLE_PREFIX + 'source', meta,
-       sa.Column('id', sa.Integer, primary_key=True, autoincrement="auto"),
+       sa.Column('id', sa.Integer, primary_key=True, autoincrement=True),
        sa.Column('source', sa.String),
        sa.Column('ts', sa.String, default=sa.func.now()),
        sa.Column('version', sa.Integer, default=1),
@@ -38,7 +48,7 @@ class InventoryStorage:
      )
 
      self.inventory_table = sa.Table(TABLE_PREFIX + 'inventory', meta,
-       sa.Column('inventory_id', sa.Integer, primary_key=True, autoincrement="auto"),
+       sa.Column('inventory_id', sa.Integer, primary_key=True, autoincrement=True),
        sa.Column('version', sa.Integer),
 
        sa.Column('source', sa.String),
@@ -127,10 +137,9 @@ class InventoryStorage:
        return False
 
      # store data
-     trans = self.conn.begin()
-     self.engine.execute(self.source_table.insert(), sources_save)
-     self.engine.execute(self.inventory_table.insert(), data)
-     trans.commit()
+     with self.engine.begin() as conn:
+       conn.execute(self.source_table.insert(), sources_save)
+       conn.execute(self.inventory_table.insert(), data)
      return True
 
    def cleanup(self, days):
@@ -140,20 +149,21 @@ class InventoryStorage:
 		.where(self.source_table.c.ts <= datetime.today() - timedelta(days=days)))
      res = res.fetchall()
 
-     trans = self.conn.begin()
-     for row in res:
-       logging.debug("prune: source={}, version={}".format(row["source"], row["version"]))
-       self.engine.execute(self.inventory_table.delete().where(
-             (self.inventory_table.c.source == row["source"]) &
-                (self.inventory_table.c.version == row["version"])
-         ))
-       self.engine.execute(self.source_table.delete().where(
-             (self.source_table.c.source == row["source"]) &
-                (self.source_table.c.version == row["version"])
-         ))
-     trans.commit()
-     pass
+     with self.engine.begin() as conn:
+       for row in res:
+         logging.debug("prune: source={}, version={}".format(row["source"], row["version"]))
+         conn.execute(self.inventory_table.delete().where(
+               (self.inventory_table.c.source == row["source"]) &
+                  (self.inventory_table.c.version == row["version"])
+           ))
+         conn.execute(self.source_table.delete().where(
+               (self.source_table.c.source == row["source"]) &
+                  (self.source_table.c.version == row["version"])
+           ))
+     return True
 
    def disconnect(self):
+     self.conn.invalidate()
      self.conn.close()
+     self.conn = None
      return True

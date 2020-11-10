@@ -1,5 +1,5 @@
 """CloudInventario"""
-import os, sys, importlib, re
+import os, sys, importlib, re, threading
 from pprint import pprint
 
 from cloudinventario.storage import InventoryStorage
@@ -10,7 +10,7 @@ class CloudInventario:
 
    def __init__(self, config):
      self.config = config
-     self._inventory = []
+     self.lock = threading.Lock()
 
    @property
    def collectors(self):
@@ -41,34 +41,27 @@ class CloudInventario:
      wd = os.getcwd()
      os.chdir("/tmp")
 
-     ret = False
+     inventory = None
      try:
        instance = self.loadCollector(collector)
 
        if instance.login():
-         self._inventory = instance.fetch()
+         inventory = instance.fetch()
          instance.logout()
-         ret = True
      finally:
        os.chdir(wd)
 
-     return ret
+     return inventory
 
-   @property
-   def inventory(self):
-     return self._inventory
-
-   def clear(self):
-     self._inventory = []
-     return True
-
-   def store(self):
+   def store(self, inventory):
      store_config = self.config["storage"]
-     store = InventoryStorage(store_config)
 
-     store.connect()
-     store.save(self._inventory)
-     store.disconnect()
+     with self.lock:
+       store = InventoryStorage(store_config)
+
+       store.connect()
+       store.save(inventory)
+       store.disconnect()
 
      return True
 

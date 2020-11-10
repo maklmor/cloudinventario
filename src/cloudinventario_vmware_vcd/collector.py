@@ -94,9 +94,12 @@ class CloudCollectorVMWareVCD(CloudCollector):
     res_list = vdc.list_resources(vcd.EntityType.VAPP)
     for vapp_def in res_list:
       vapp_name = vapp_def["name"]
-      vapp_res = vdc.get_vapp(vapp_name)
-      vapp = vcdVApp(self.client, resource=vapp_res)
-      res.extend(self.__process_vapp(org_name, vdc_name, vapp_name, vdc, vapp))
+      try:
+        vapp_res = vdc.get_vapp(vapp_name)
+        vapp = vcdVApp(self.client, resource=vapp_res)
+        res.extend(self.__process_vapp(org_name, vdc_name, vapp_name, vdc, vapp))
+      except:
+        pass
       if TEST:
         break
     return res
@@ -175,7 +178,7 @@ class CloudCollectorVMWareVCD(CloudCollector):
           "name": rec[key].get("name") or key,
           "capacity": int(rec[key].get("size-MB") or 0),
           "free": None,
-          "profile": rec[key].get("StorageProfile"),
+          "profile": rec[key].get("storageProfile") and rec[key].get("storageProfile").get("name"),
           "thin": rec[key].get("ThinProvisioned"),
           "ssd": None
         }
@@ -214,7 +217,7 @@ class CloudCollectorVMWareVCD(CloudCollector):
     rec = {**rec, **rec_detail}
     # special handling for disks
     for disk in vm.resource.VmSpecSection.DiskSection.DiskSettings:
-      rec_disk = to_dict(disk)
+      rec_disk = self.__to_dict(disk)
       rec_disk["id"] = str(disk["DiskId"])
       rec_disk_key = "disk-" + rec_disk["id"]
       rec[rec_disk_key] = {**rec[rec_disk_key], **rec_disk}
@@ -230,7 +233,10 @@ class CloudCollectorVMWareVCD(CloudCollector):
     if hasattr(obj, '__dict__') and len(obj.__dict__) > 0:
        # XXX: not handling iterable objects (not possible without knowing struct)
        for key in obj.__dict__:
-           result[key[0].lower() + key[1:]] = self.__to_dict(obj[key])
+         result[key[0].lower() + key[1:]] = self.__to_dict(obj[key])
+    elif hasattr(obj, 'keys'):
+       for key in obj.keys():
+         result[key[0].lower() + key[1:]] = obj.get(key)
     else:
        return obj.text
     return result
