@@ -106,6 +106,9 @@ class InventoryStorage:
      return sources
 
    def save(self, data):
+     if data is None:
+       return False
+
      sources = self.__get_source_version_max()
 
      # increment versions

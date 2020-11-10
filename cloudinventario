@@ -21,7 +21,7 @@ def getArgs():
                        help='Run all collectors')
    parser.add_argument('-p', '--prune', action='store_true',
                        help='Cleanup old data')
-   parser.add_argument('-f', '--forks', action='store', nargs='?', const=7, type=int,
+   parser.add_argument('-f', '--forks', action='store', nargs='?', type=int,
                        help='Parallel fork')
    parser.add_argument('-v', '--verbose', action='count', default=0,
                        help='Verbose')
@@ -35,20 +35,27 @@ def loadConfig(config_file):
    return None
 
 # collect
-def collect(cinv, name):
+def collect(data):
+   config = data['config']
+   name = data['name']
+
+   cinv = CloudInventario(config)
+
    logging.info("collector name={}".format(name))
-   inventory = cinv.collect(name)
-   if inventory is not None:
-#      pprint(inventory)
-      logging.info("storing data for name={}".format(name))
-      cinv.store(inventory)
-      return True
-   else:
-      logging.info("collector failed name={}".format(name))
+   try:
+     inventory = cinv.collect(name)
+     if inventory is not None:
+        logging.info("storing data for name={}".format(name))
+        cinv.store(inventory)
+        return True
+     else:
+        logging.info("collector failed name={}".format(name))
+   except Exception as e:
+     logging.error("collector failed with exception", exc_info=e)
    return False
 
 # main
-async def main(args, executor):
+def main(args):
 
   # init logging
   level = logging.WARNING
@@ -74,28 +81,29 @@ async def main(args, executor):
     cinv.store(inventory)
     return 0
   elif args.all:
-    cinv.store([])
+    # force DB setup
+    cinv.store(None)
 
-    loop = asyncio.get_event_loop()
-    futures = [
-      loop.run_in_executor(executor, collect, cinv, col)
-        for col in cinv.collectors
-    ]
-    completed, pending = await asyncio.wait(futures)
-    return 0
+    # execute concurently
+    ret = 0
+    with concurrent.futures.ProcessPoolExecutor(max_workers = args.forks or 7) as executor:
+      data = []
+      for col in cinv.collectors:
+        data.append({
+           "config": config,
+           "name": col
+         })
+      for res in executor.map(collect, data):
+         if res is not True:
+           ret = 1
+    return ret
   elif args.prune:
     return 0
   else:
     print("No action specified !", file=sys.stderr)
     return 1
 
-# MAIN (with parallel execution)
+# MAIN
 args = getArgs()
-args.forks = 1 # TODO: forks not working now
-executor = concurrent.futures.ThreadPoolExecutor(max_workers = args.forks)
-event_loop = asyncio.get_event_loop()
-try:
-  ret = event_loop.run_until_complete(main(args, executor))
-finally:
-  event_loop.close()
+ret = main(args)
 sys.exit(ret)
