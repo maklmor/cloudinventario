@@ -92,7 +92,7 @@ def main(args):
     cinv.store(None)
 
     # execute concurently
-    ret = 0
+    ret = 1
     with concurrent.futures.ProcessPoolExecutor(max_workers = args.forks or 7) as executor:
       data = []
       for col in cinv.collectors:
@@ -100,9 +100,11 @@ def main(args):
            "config": config,
            "name": col
          })
+
+      # if at least one succeeded, its SUCCESS
       for res in executor.map(collect, data):
-         if res is not True:
-           ret = 1
+        if res is True:
+          ret = 0
     return ret
   elif args.prune:
     return 0
