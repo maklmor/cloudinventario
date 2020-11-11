@@ -1,5 +1,5 @@
 """CloudInventario"""
-import os, sys, importlib, re, threading
+import os, sys, importlib, re, threading, logging
 from pprint import pprint
 
 from cloudinventario.storage import InventoryStorage
@@ -40,21 +40,23 @@ class CloudInventario:
      mod_instance = mod.setup(collector, mod_cfg['config'], mod_cfg.get('default', {}), options or {})
      return mod_instance
 
-   def collect(self, collector):
+   def collect(self, collector, options = None):
      # workaround for buggy libs
      wd = os.getcwd()
      os.chdir("/tmp")
 
      inventory = None
      try:
-       instance = self.loadCollector(collector)
+       instance = self.loadCollector(collector, options)
 
        if instance.login():
          inventory = instance.fetch()
          instance.logout()
+     except Exception as e:
+       logging.error("Exception while processing collector={}".format(collector))
+       raise
      finally:
        os.chdir(wd)
-
      return inventory
 
    def store(self, inventory):

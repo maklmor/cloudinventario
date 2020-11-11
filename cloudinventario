@@ -4,6 +4,10 @@ import multiprocessing
 import os, sys, argparse, logging, yaml, asyncio, setproctitle
 from pprint import pprint
 
+# XXX: this is for setproctitle
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
+
 DN = os.path.dirname(os.path.abspath(__file__))
 
 sys.path.append(DN + '/src');
@@ -23,7 +27,9 @@ def getArgs():
    parser.add_argument('-p', '--prune', action='store_true',
                        help='Cleanup old data')
    parser.add_argument('-f', '--forks', action='store', nargs='?', type=int,
-                       help='Parallel fork')
+                       help='Parallel collectors')
+   parser.add_argument('-t', '--tasks', action='store', nargs='?', type=int,
+                       help='Parallel tasks per collector')
    parser.add_argument('-v', '--verbose', action='count', default=0,
                        help='Verbose')
    args = parser.parse_args()
@@ -39,16 +45,17 @@ def loadConfig(config_file):
 def collect(data):
    config = data['config']
    name = data['name']
+   options = data['options']
 
    proctitle = setproctitle.getproctitle()
-   setproctitle.setproctitle("[cloudinventario] " + name)
+   setproctitle.setproctitle("[cloudinventario] {}".format(name))
    multiprocessing.current_process().name = name
 
    cinv = CloudInventario(config)
 
    logging.info("collector name={}".format(name))
    try:
-     inventory = cinv.collect(name)
+     inventory = cinv.collect(name, options)
      if inventory is not None:
         logging.info("storing data for name={}".format(name))
         cinv.store(inventory)
@@ -76,6 +83,10 @@ def main(args):
   config = loadConfig(args.config)
   cinv = CloudInventario(config)
 
+  options = {
+    "tasks": args.tasks or 2
+  }
+
   if args.prune:
     cinv.cleanup(days = 5)
 
@@ -84,7 +95,7 @@ def main(args):
       print("{}".format(col))
     return 0
   elif args.name:
-    inventory = cinv.collect(args.name)
+    inventory = cinv.collect(args.name, options)
     cinv.store(inventory)
     return 0
   elif args.all:
@@ -98,7 +109,8 @@ def main(args):
       for col in cinv.collectors:
         data.append({
            "config": config,
-           "name": col
+           "name": col,
+           "options": options
          })
 
       # if at least one succeeded, its SUCCESS
