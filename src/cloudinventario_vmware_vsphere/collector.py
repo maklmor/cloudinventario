@@ -252,6 +252,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
         res.extend(self.__process_vmchild(c, depth + 1, prefix))
         if TEST:
           break
+        break
       return res
 
     if isinstance(child, vim.VirtualMachine):
@@ -313,21 +314,31 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     for vd in vm.config.hardware.device:
       if isinstance(vd, vim.VirtualDisk):
         storage += vd.capacityInKB
+        datastore = None
+        thin = None
+
+        # get attribs
+        if isinstance(vd.backing, vim.vm.device.VirtualDevice.FileBackingInfo):
+          datastore = vd.backing.datastore.name
+        elif isinstance(vd.backing, vim.vm.device.VirtualDisk.FlatVer2BackingInfo):
+          datastore = vd.backing.deviceName
+        if isinstance(vd.backing, vim.vm.device.VirtualDisk.FlatVer2BackingInfo):
+          thin = vd.backing.thinProvisioned
+
         # TODO: add info from vm.guest.disk
         storages.append({
           "id": vd.key,
           "name": vd.deviceInfo.label,
           "capacity": int(vd.capacityInKB // 1024),
           "free": None,
-          "profile": None,
-          "thin": None,
+          "profile": datastore,
+          "thin": thin,
           "ssd": None,
         })
     if storage > 0:
       rec["storage"] = int(storage // 1024)
     if len(storages) > 0:
       rec["storages"] = storages
-    pprint(storages)
 
     # networks
     networks = []
