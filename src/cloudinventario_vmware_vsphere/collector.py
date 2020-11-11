@@ -309,17 +309,35 @@ class CloudCollectorVMWareVSphere(CloudCollector):
 
     # storage
     storage = 0
+    storages = []
     for vd in vm.config.hardware.device:
       if isinstance(vd, vim.VirtualDisk):
         storage += vd.capacityInKB
+        # TODO: add info from vm.guest.disk
+        storages.append({
+          "id": vd.key,
+          "name": vd.deviceInfo.label,
+          "capacity": int(vd.capacityInKB // 1024),
+          "free": None,
+          "profile": None,
+          "thin": None,
+          "ssd": None,
+        })
     if storage > 0:
-      rec["storage"] = storage // 1024
+      rec["storage"] = int(storage // 1024)
+    if len(storages) > 0:
+      rec["storages"] = storages
+    pprint(storages)
 
     # networks
     networks = []
     for nic in vm.guest.net:
-      net = { "mac": nic.macAddress, "network": nic.network,
-        "ip": None, "connected": nic.connected
+      net = {
+        "id": nic.deviceConfigId,
+        "mac": nic.macAddress,
+        "network": nic.network,
+        "ip": None,
+        "connected": nic.connected
          }
       for ip in nic.ipConfig.ipAddress:
         if not net["ip"] and ip.prefixLength <= 32:	# DUMMY distinguish IPv4 address
@@ -348,6 +366,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       "memory": int(rec.get("memory") or 0),
       "disks": int(rec.get("disks") or 0),
       "storage": int(rec.get("storage") or 0),
+      "storages": rec.get("storages"),
       "primary_ip": rec["primary_ip"],
       "networks": rec.get("networks"),
       "os": rec["os"],
