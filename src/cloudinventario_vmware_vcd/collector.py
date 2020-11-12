@@ -86,6 +86,7 @@ class CloudCollectorVMWareVCD(CloudCollector):
     vdc.get_resource()
     rec = self.__to_dict(vdc.resource);
 
+    logging.debug("new vdc name={}".format(vdc_name))
     res.append(self.new_record('vdc', {
       "name": vdc_name,
       "cluster": org_name,
@@ -243,9 +244,10 @@ class CloudCollectorVMWareVCD(CloudCollector):
        # XXX: not handling iterable objects (not possible without knowing struct)
        for key in obj.__dict__:
          result[key[0].lower() + key[1:]] = self.__to_dict(obj[key])
-    elif hasattr(obj, 'keys'):
+    elif hasattr(obj, 'keys') and len(obj.keys()) > 0:
        for key in obj.keys():
-         result[key[0].lower() + key[1:]] = obj.get(key)
+         if key not in ['type']:
+           result[key[0].lower() + key[1:]] = obj.get(key)
     else:
        return obj.text
     return result
