@@ -1,0 +1,1 @@
+"""VMWare VCloud Director collector."""
