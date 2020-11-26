@@ -101,8 +101,6 @@ class CloudCollectorVMWareVCD(CloudCollector):
       rec = {**rec_detail, **rec}
     else:
       logging.warning("Failed to fetch ORG_VDC reconrd for vdc name ={}".format(vdc_name))
-    pprint(rec)
-    sys.exit(1)
 
     logging.debug("new vdc name={}".format(vdc_name))
     res.append(self.new_record('vdc', {
