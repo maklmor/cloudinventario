@@ -8,6 +8,8 @@ from pyvcloud.vcd.vdc import VDC as vcdVDC
 from pyvcloud.vcd.vapp import VApp as vcdVApp
 from pyvcloud.vcd.vapp import VM as vcdVM
 from pyvcloud.vcd.utils import to_dict, vapp_to_dict, vm_to_dict, stdout_xml
+from pyvcloud.vcd.client import QueryResultFormat
+from pyvcloud.vcd.client import ResourceType
 
 from cloudinventario.helpers import CloudCollector
 
@@ -67,6 +69,7 @@ class CloudCollectorVMWareVCD(CloudCollector):
     res = []
     org_name = self.org.get_name()
 
+
     rec = None
     res.append(self.new_record('org', {
       "name": org_name,
@@ -85,6 +88,21 @@ class CloudCollectorVMWareVCD(CloudCollector):
 
     vdc.get_resource()
     rec = self.__to_dict(vdc.resource);
+
+    # get more info
+    query_filter = ('name', vdc_name)
+    query = self.client.get_typed_query(
+      ResourceType.ORG_VDC.value,
+      query_result_format=QueryResultFormat.RECORDS,
+      equality_filter=query_filter)
+    result = list(query.execute())
+    if len(result) == 1:
+      rec_detail = to_dict(result[0])
+      rec = {**rec_detail, **rec}
+    else:
+      logging.warning("Failed to fetch ORG_VDC reconrd for vdc name ={}".format(vdc_name))
+    pprint(rec)
+    sys.exit(1)
 
     logging.debug("new vdc name={}".format(vdc_name))
     res.append(self.new_record('vdc', {
