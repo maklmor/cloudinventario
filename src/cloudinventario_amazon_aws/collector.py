@@ -24,9 +24,10 @@ class CloudCollectorAmazonAWS(CloudCollector):
   def _login(self):
     access_key = self.config['access_key']
     secret_key = self.config['secret_key']
+    region = self.config['region']
 
-    logging.info("logging in AWS")
-    self.client = boto3.client('ec2', aws_access_key_id = access_key, aws_secret_access_key = secret_key)
+    logging.info("logging in AWS region={}".format(region))
+    self.client = boto3.client('ec2', aws_access_key_id = access_key, aws_secret_access_key = secret_key, region_name=region)
     self.instance_types = {}
     return True
 
