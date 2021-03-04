@@ -1,9 +1,17 @@
 """Classes used by CloudInventario."""
 import requests
+import datetime
 import json
 #from pprint import pprint
 
 import cloudinventario.platform as platform
+
+class CloudEncoder(json.JSONEncoder):
+  def default(self, z):
+    if isinstance(z, datetime.datetime):
+      return (str(z))
+    else:
+      return super().default(z)
 
 class CloudCollector:
   """Cloud collector."""
@@ -60,10 +68,10 @@ class CloudCollector:
                  "cpus", "memory", "disks", "storage", "primary_ip",
                  "os", "os_family",
                  "status", "is_on",
-                 "owner", "tags"]
+                 "owner"]
     attrs = {**self.defaults, **attrs}
 
-    attr_json_keys = [ "networks", "storages" ]
+    attr_json_keys = [ "networks", "storages", "tags" ]
     rec = {
       "type": rectype,
       "source": self.name,
@@ -76,6 +84,10 @@ class CloudCollector:
       else:
         rec[key] = attrs[key]
         del(attrs[key])
+
+#    for key in attr_tag_keys:
+#      data = attrs.get(key, [])
+#      rec[key] = ",".join(map(lambda k: "{}={}".format(k, data[k]), data.keys()))
 
     for key in attr_json_keys:
       if not attrs.get(key):
@@ -92,5 +104,5 @@ class CloudCollector:
 
     if len(attrs) > 0:
       rec["attributes"] = json.dumps(attrs)
-    rec["details"] = json.dumps(details)
+    rec["details"] = json.dumps(details, cls=CloudEncoder)
     return rec

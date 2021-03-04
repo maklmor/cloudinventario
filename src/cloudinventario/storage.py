@@ -74,7 +74,7 @@ class InventoryStorage:
        sa.Column('is_on', sa.Integer),
 
        sa.Column('owner', sa.String),
-       sa.Column('tags', sa.String),
+       sa.Column('tags', sa.Text),
 
        sa.Column('networks', sa.String),
        sa.Column('storages', sa.String),

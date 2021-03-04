@@ -6,3 +6,4 @@ sqlalchemy-pysqlite3
 pyvcloud
 pyvmomi
 hcloud
+boto3
