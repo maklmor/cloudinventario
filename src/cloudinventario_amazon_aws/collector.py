@@ -9,6 +9,9 @@ from cloudinventario.helpers import CloudCollector
 # TEST MODE
 TEST = 0
 
+# LOGGING
+logging.getLogger("botocore").propagate = False
+
 def setup(name, config, defaults, options):
   return CloudCollectorAmazonAWS(name, config, defaults, options)
 
@@ -22,8 +25,8 @@ class CloudCollectorAmazonAWS(CloudCollector):
     access_key = self.config['access_key']
     secret_key = self.config['secret_key']
 
-    logging.info("logging in AWS={}".format(self.name))
-    self.client = boto3.client('ec2')
+    logging.info("logging in AWS")
+    self.client = boto3.client('ec2', aws_access_key_id = access_key, aws_secret_access_key = secret_key)
     self.instance_types = {}
     return True
 
@@ -95,6 +98,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
     for tag in rec.get("Tags", []):
       tags[ tag["Key"] ] = tag["Value"]
 
+    logging.debug("new VM name={}".format(rec["KeyName"]))
     return self.new_record('vm', {
       "created": None,
       "name": rec["KeyName"],
@@ -113,9 +117,8 @@ class CloudCollectorAmazonAWS(CloudCollector):
       "public_fqdn": rec.get("PublicDnsName"),
       "networks": networks,
       "storages": instance_def["storages"],
-      "attributes": {
-        "ebs": rec.get("EbsOptimized") or False,
-      },
+      "storage_ebs_optimized": rec.get("EbsOptimized") or False,
+      "monitoring": rec.get("Monitoring"),
 #      "owner": None,
       "os": rec.get("Platform") or "Other",
       "status": rec["State"]["Name"],
