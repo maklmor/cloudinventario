@@ -9,9 +9,6 @@ from cloudinventario.helpers import CloudCollector
 # TEST MODE
 TEST = 0
 
-# LOGGING
-logging.getLogger("botocore").propagate = False
-
 def setup(name, config, defaults, options):
   return CloudCollectorAmazonAWS(name, config, defaults, options)
 
@@ -26,8 +23,14 @@ class CloudCollectorAmazonAWS(CloudCollector):
     secret_key = self.config['secret_key']
     region = self.config['region']
 
+    for logger in ["boto3", "botocore", "urllib3"]:
+      logging.getLogger(logger).propagate = False
+      logging.getLogger(logger).setLevel(logging.WARNING)
+
+    # TODO: if region == ALL, loop all regions slowly or parallely ?
+
     logging.info("logging in AWS region={}".format(region))
-    self.client = boto3.client('ec2', aws_access_key_id = access_key, aws_secret_access_key = secret_key, region_name=region)
+    self.client = boto3.client('ec2', aws_access_key_id = access_key, aws_secret_access_key = secret_key, region_name = region)
     self.instance_types = {}
     return True
 
@@ -88,21 +91,33 @@ class CloudCollectorAmazonAWS(CloudCollector):
     for iface in rec["NetworkInterfaces"]:
       networks.append({
         "id": iface["NetworkInterfaceId"],
-        "name": rec.get("Description"),
+        "name": iface.get("Name") or iface.get("Description"),
         "mac": iface["MacAddress"],
-        "ip": iface.get("PrivateIpAddress"),
+        "ip": iface["PrivateIpAddress"],
+        "fqdn": iface["PrivateDnsName"],
         "network": iface["SubnetId"],
         "connected": (iface["Status"] == "in-use" and True or False)
       })
+      if iface.get("Association"):
+        networks.append({
+          "id": iface["NetworkInterfaceId"],
+          "type": "virtual",	# like elastic (== shared)
+          "name": "Public IP",
+          "mac": iface["MacAddress"],
+          "ip": iface["Association"].get("PublicIp"),
+          "fqdn": iface["Association"].get("PublicDnsName"),
+          "connected": True
+        })
 
     tags = {}
     for tag in rec.get("Tags", []):
       tags[ tag["Key"] ] = tag["Value"]
 
-    logging.debug("new VM name={}".format(rec["KeyName"]))
+    name = tags.get("Name") or rec["InstanceId"]
+    logging.debug("new VM name={}".format(name))
     return self.new_record('vm', {
       "created": None,
-      "name": rec["KeyName"],
+      "name": name,
       "cluster": rec["Placement"]["AvailabilityZone"],
       "project": rec["Placement"]["GroupName"],
       "description": None,
@@ -110,15 +125,15 @@ class CloudCollectorAmazonAWS(CloudCollector):
       "type": instance_type,
       "cpus": rec["CpuOptions"]["CoreCount"] or instance_def["cpu"],
       "memory": instance_def["memory"],
-      "disks": len(instance_def["storages"]),
-      "storage": instance_def["storage"],
+      "disks": None,	# TODO
+      "storage": None,	# TODO
       "primary_ip":  rec.get("PrivateIpAddress") or rec.get("PublicIpAddress"),
       "primary_fqdn": rec.get("PrivateDnsName") or rec.get("PublicDnsName"),
       "public_ip": rec.get("PublicIpAddress"),
       "public_fqdn": rec.get("PublicDnsName"),
       "networks": networks,
-      "storages": instance_def["storages"],
-      "storage_ebs_optimized": rec.get("EbsOptimized") or False,
+      "storages": None,	# TODO
+      #"storage_ebs_optimized": rec.get("EbsOptimized") or False,
       "monitoring": rec.get("Monitoring"),
 #      "owner": None,
       "os": rec.get("Platform") or "Other",
