@@ -136,7 +136,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
       #"storage_ebs_optimized": rec.get("EbsOptimized") or False,
       "monitoring": rec.get("Monitoring"),
 #      "owner": None,
-      "os": rec.get("Platform") or "Other",
+      "os": rec.get("Platform"),
       "status": rec["State"]["Name"],
       "is_on": (rec["State"]["Name"] == "running" and 1 or 0),
       "tags": tags,
