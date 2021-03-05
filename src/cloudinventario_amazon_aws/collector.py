@@ -102,7 +102,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
         networks.append({
           "id": iface["NetworkInterfaceId"],
           "type": "virtual",	# like elastic (== shared)
-          "name": "Public IP",
+          "name": iface.get("Name") or iface.get("Description"),
           "mac": iface["MacAddress"],
           "ip": iface["Association"].get("PublicIp"),
           "fqdn": iface["Association"].get("PublicDnsName"),
