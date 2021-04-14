@@ -93,7 +93,7 @@ class CloudCollector:
       if not attrs.get(key):
         rec[key] = '[]'
       else:
-        rec[key] = json.dumps(attrs[key])
+        rec[key] = json.dumps(attrs[key], default=str) # added default=str -> problem with AttachTime,CreateTime
         del(attrs[key])
 
     if "os_family" not in attrs.keys() and rec.get("os"):

@@ -36,6 +36,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
 
   def _fetch(self, collect):
     res = []
+    self.storage = self._get_storage_info() 
 
     next_token = ""
     while True:
@@ -60,28 +61,52 @@ class CloudCollectorAmazonAWS(CloudCollector):
         name = rec['InstanceType']
         data = {
           "cpu": rec['VCpuInfo']['DefaultVCpus'],
-          "memory": rec['MemoryInfo']['SizeInMiB'],
-          "storage": None,
-          "storages": []
+          "memory": rec['MemoryInfo']['SizeInMiB']
         }
-        if rec.get("InstanceStorageInfo"):
-          data["storage"] = rec['InstanceStorageInfo']['TotalSizeInGB'] * 1024,
-          for disk in rec['InstanceStorageInfo']['Disks']:
-            data['storages'].append({
-              "id": None,
-              "name": None,
-              "capacity": disk['SizeInGB'] * 1024,
-              "free": None,
-              "type": disk['Type'],
-              "ssd": (disk['Type'] == 'ssd') or 0,
-            })
-          data['detail'] = rec
+        # if rec.get("InstanceStorageInfo"):
+        #   data["storage"] = rec['InstanceStorageInfo']['TotalSizeInGB'] * 1024
+        #   for disk in rec['InstanceStorageInfo']['Disks']:
+        #     data['storages'].append({
+        #       "id": None,
+        #       "name": None,
+        #       "capacity": disk['SizeInGB'] * 1024,  # in MB
+        #       "free": None,
+        #       "type": disk['Type'],
+        #       "ssd": (disk['Type'] == 'ssd') or 0
+        #     })
+        data['details'] = rec
         self.instance_types[name] = data
 
     if itype not in self.instance_types:
       raise Exception("Instance type '{}' not found".format(itype))
 
     return self.instance_types[itype]
+
+  def _get_storage_info(self):
+    storage = {}
+
+    vinfo = self.client.describe_volumes()
+
+    for volume in vinfo['Volumes']:
+      for atch in volume['Attachments']:
+
+        if atch['InstanceId'] not in storage:
+          storage[atch['InstanceId']] = {
+            "size": 0,
+            "storages": []
+          }
+        storage[atch['InstanceId']]["size"] += volume['Size'] * 1024
+        storage[atch['InstanceId']]["storages"].append({
+        "id": volume['VolumeId'],
+        "name": atch['Device'],
+        "capacity": volume['Size'] * 1024,  # in MB
+        "free": None,
+        "type": None,
+        "ssd": None,
+        "details": volume
+      })
+
+    return storage
 
   def _process_vm(self, rec):
     instance_type = rec["InstanceType"]
@@ -126,13 +151,13 @@ class CloudCollectorAmazonAWS(CloudCollector):
       "cpus": rec["CpuOptions"]["CoreCount"] or instance_def["cpu"],
       "memory": instance_def["memory"],
       "disks": None,	# TODO
-      "storage": None,	# TODO
+      "storage": self.storage[rec["InstanceId"]]["size"],
       "primary_ip":  rec.get("PrivateIpAddress") or rec.get("PublicIpAddress"),
       "primary_fqdn": rec.get("PrivateDnsName") or rec.get("PublicDnsName"),
       "public_ip": rec.get("PublicIpAddress"),
       "public_fqdn": rec.get("PublicDnsName"),
       "networks": networks,
-      "storages": None,	# TODO
+      "storages": self.storage[rec["InstanceId"]]["storages"],
       #"storage_ebs_optimized": rec.get("EbsOptimized") or False,
       "monitoring": rec.get("Monitoring"),
 #      "owner": None,
