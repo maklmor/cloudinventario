@@ -22,6 +22,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
     access_key = self.config['access_key']
     secret_key = self.config['secret_key']
     region = self.config['region']
+    self.account_id = self.config.get('account_id')
 
     for logger in ["boto3", "botocore", "urllib3"]:
       logging.getLogger(logger).propagate = False
@@ -63,17 +64,6 @@ class CloudCollectorAmazonAWS(CloudCollector):
           "cpu": rec['VCpuInfo']['DefaultVCpus'],
           "memory": rec['MemoryInfo']['SizeInMiB']
         }
-        # if rec.get("InstanceStorageInfo"):
-        #   data["storage"] = rec['InstanceStorageInfo']['TotalSizeInGB'] * 1024
-        #   for disk in rec['InstanceStorageInfo']['Disks']:
-        #     data['storages'].append({
-        #       "id": None,
-        #       "name": None,
-        #       "capacity": disk['SizeInGB'] * 1024,  # in MB
-        #       "free": None,
-        #       "type": disk['Type'],
-        #       "ssd": (disk['Type'] == 'ssd') or 0
-        #     })
         data['details'] = rec
         self.instance_types[name] = data
 
@@ -101,11 +91,10 @@ class CloudCollectorAmazonAWS(CloudCollector):
         "name": atch['Device'],
         "capacity": volume['Size'] * 1024,  # in MB
         "free": None,
-        "type": None,
-        "ssd": None,
+        "type": volume['VolumeType'],
+        "encrypted": volume['Encrypted'],
         "details": volume
       })
-
     return storage
 
   def _process_vm(self, rec):
@@ -160,7 +149,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
       "storages": self.storage[rec["InstanceId"]]["storages"],
       #"storage_ebs_optimized": rec.get("EbsOptimized") or False,
       "monitoring": rec.get("Monitoring"),
-#      "owner": None,
+      "owner": self.account_id,
       "os": rec.get("Platform"),
       "status": rec["State"]["Name"],
       "is_on": (rec["State"]["Name"] == "running" and 1 or 0),
