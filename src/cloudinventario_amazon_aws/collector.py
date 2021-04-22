@@ -78,15 +78,22 @@ class CloudCollectorAmazonAWS(CloudCollector):
     vinfo = self.client.describe_volumes()
 
     for volume in vinfo['Volumes']:
-      for atch in volume['Attachments']:
-
-        if atch['InstanceId'] not in storage:
-          storage[atch['InstanceId']] = {
+      # XXX: sorting attachments for stable summing
+      attachments = newlist = sorted(volume['Attachments'], key=lambda k: k['InstanceId']) 
+      for idx in range(0, len(attachments)):
+        atch = volume['Attachments'][idx]
+        instance_id = atch['InstanceId']
+        if instance_id not in storage:
+          storage[instance_id] = {
             "size": 0,
             "storages": []
           }
-        storage[atch['InstanceId']]["size"] += volume['Size'] * 1024
-        storage[atch['InstanceId']]["storages"].append({
+
+        # XXX: only count storage size on one instance
+        if idx == 0:
+          storage[instance_id]["size"] += volume['Size'] * 1024
+
+        storage[instance_id]["storages"].append({
         "id": volume['VolumeId'],
         "name": atch['Device'],
         "capacity": volume['Size'] * 1024,  # in MB
