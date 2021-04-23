@@ -17,10 +17,19 @@ class CloudCollectorAmazonAWS(CloudCollector):
   def __init__(self, name, config, defaults, options):
     super().__init__(name, config, defaults, options)
 
+  def _config_keys():
+    return {
+       access_key: 'AWS AccessKeyID',
+       secret_key: 'AWS SecretAccessKey',
+       session_token: 'AWS SessionToken',
+       region: 'AWS Region',
+       account_id: 'AWS Account'
+    }
 
   def _login(self):
     access_key = self.config['access_key']
     secret_key = self.config['secret_key']
+    session_token = self.config.get('session_token')
     region = self.config['region']
     self.account_id = self.config.get('account_id')
 
@@ -31,7 +40,8 @@ class CloudCollectorAmazonAWS(CloudCollector):
     # TODO: if region == ALL, loop all regions slowly or parallely ?
 
     logging.info("logging in AWS region={}".format(region))
-    self.client = boto3.client('ec2', aws_access_key_id = access_key, aws_secret_access_key = secret_key, region_name = region)
+    self.client = boto3.client('ec2', aws_access_key_id = access_key, aws_secret_access_key = secret_key,
+                                  aws_session_token = session_token, region_name = region)
     self.instance_types = {}
     return True
 
