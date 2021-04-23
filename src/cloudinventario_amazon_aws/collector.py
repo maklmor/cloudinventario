@@ -37,9 +37,12 @@ class CloudCollectorAmazonAWS(CloudCollector):
       logging.getLogger(logger).propagate = False
       logging.getLogger(logger).setLevel(logging.WARNING)
 
-    # TODO: if region == ALL, loop all regions slowly or parallely ?
+    if self.account_id is None:
+      sts = boto3.client('sts', aws_access_key_id = access_key, aws_secret_access_key = secret_key)
+      ident = sts.get_caller_identity()
+      self.account_id = ident['Account']
 
-    logging.info("logging in AWS region={}".format(region))
+    logging.info("logging in AWS account_id={}, region={}".format(self.account_id, region))
     self.client = boto3.client('ec2', aws_access_key_id = access_key, aws_secret_access_key = secret_key,
                                   aws_session_token = session_token, region_name = region)
     self.instance_types = {}
@@ -125,7 +128,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
         "name": iface.get("Name") or iface.get("Description"),
         "mac": iface["MacAddress"],
         "ip": iface["PrivateIpAddress"],
-        "fqdn": iface["PrivateDnsName"],
+        "fqdn": iface.get("PrivateDnsName"),
         "network": iface["SubnetId"],
         "connected": (iface["Status"] == "in-use" and True or False)
       })
