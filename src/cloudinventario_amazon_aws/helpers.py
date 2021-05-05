@@ -28,3 +28,4 @@ class CloudInvetarioAWSResource():
 			return data
 		except Exception:
 			logging.error("An error occured while reading data about following type of AWS resource: {}", self.res_type)
+			

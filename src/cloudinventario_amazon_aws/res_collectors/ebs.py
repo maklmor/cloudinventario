@@ -38,3 +38,4 @@ class CloudInventarioEbs(CloudInvetarioAWSResource):
           "details": volume
         })
       return storage
+      
