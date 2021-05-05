@@ -1,1 +1,1 @@
-"""VMWare VCloud Director collector."""
+"""Hetzner Cloud collector."""

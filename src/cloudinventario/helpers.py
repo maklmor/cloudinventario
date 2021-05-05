@@ -25,6 +25,7 @@ class CloudCollector:
     if self.allow_self_signed:
       requests.packages.urllib3.disable_warnings()
     self.verify_ssl = self.options.get('verify_ssl_certs', config.get('verify_ssl_certs', True))
+    self.rd = {}  # rd <=> resource_data
 
   def __pre_request(self):
     pass
