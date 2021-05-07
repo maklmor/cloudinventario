@@ -5,7 +5,7 @@ from pprint import pprint
 import boto3
 
 from cloudinventario.helpers import CloudCollector
-from .helpers import CloudInvetarioResourceManager
+from cloudinventario.res_helpers import CloudInvetarioResourceManager
 
 # TEST MODE
 TEST = 0

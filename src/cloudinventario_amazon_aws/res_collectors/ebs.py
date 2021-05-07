@@ -1,4 +1,4 @@
-from ..helpers import CloudInvetarioAWSResource
+from cloudinventario.res_helpers import CloudInvetarioAWSResource
 
 def get_resource_obj(client):
   return CloudInventarioEbs(client)
