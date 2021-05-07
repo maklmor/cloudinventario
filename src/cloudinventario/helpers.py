@@ -2,6 +2,8 @@
 import requests
 import datetime
 import json
+import logging
+import importlib
 #from pprint import pprint
 
 import cloudinventario.platform as platform
@@ -25,6 +27,7 @@ class CloudCollector:
     if self.allow_self_signed:
       requests.packages.urllib3.disable_warnings()
     self.verify_ssl = self.options.get('verify_ssl_certs', config.get('verify_ssl_certs', True))
+    self.rd = {}  # rd <=> resource_data
 
   def __pre_request(self):
     pass
@@ -106,3 +109,33 @@ class CloudCollector:
       rec["attributes"] = json.dumps(attrs)
     rec["details"] = json.dumps(details, cls=CloudEncoder)
     return rec
+
+class CloudInvetarioResourceManager:
+
+	def __init__(self, res_list, client, cloud_col):
+		self.res_list = res_list
+		self.client = client
+		self.cloud_col = cloud_col
+
+	def get_resource_data(self):
+		data = {}
+		
+		for res in self.res_list:
+			res_mod = importlib.import_module(self.cloud_col + ".res_collectors." + res)
+			res_obj = res_mod.get_resource_obj(self.client)
+			data[res] = res_obj.read_data()
+
+		return data
+
+class CloudInvetarioResource():
+
+	def __init__(self, client, res_type):
+		self.client = client
+		self.res_type = res_type
+
+	def read_data(self):
+		try:
+			data = self._read_data()
+			return data
+		except Exception:
+			logging.error("An error occured while reading data about following type of cloud resource: {}", self.res_type)

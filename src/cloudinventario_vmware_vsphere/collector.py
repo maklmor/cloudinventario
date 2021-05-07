@@ -15,6 +15,8 @@ def setup(name, config, defaults, options):
 
 class CloudCollectorVMWareVSphere(CloudCollector):
 
+  COLLECTOR_PKG = "cloudinventario_vmware_vsphere"
+
   def __init__(self, name, config, defaults, options):
     super().__init__(name, config, defaults, options)
 

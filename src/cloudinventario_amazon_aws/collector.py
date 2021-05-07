@@ -4,7 +4,7 @@ from pprint import pprint
 
 import boto3
 
-from cloudinventario.helpers import CloudCollector
+from cloudinventario.helpers import CloudCollector, CloudInvetarioResourceManager
 
 # TEST MODE
 TEST = 0
@@ -13,6 +13,8 @@ def setup(name, config, defaults, options):
   return CloudCollectorAmazonAWS(name, config, defaults, options)
 
 class CloudCollectorAmazonAWS(CloudCollector):
+
+  COLLECTOR_PKG = "cloudinventario_amazon_aws"
 
   def __init__(self, name, config, defaults, options):
     super().__init__(name, config, defaults, options)
@@ -49,8 +51,11 @@ class CloudCollectorAmazonAWS(CloudCollector):
     return True
 
   def _fetch(self, collect):
-    res = []
-    self.storage = self._get_storage_info() 
+    data = []
+
+    self.resource_collectors = self.config.get('collect')
+    manager = CloudInvetarioResourceManager(self.resource_collectors, self.client, self.COLLECTOR_PKG)
+    self.rd = manager.get_resource_data()
 
     next_token = ""
     while True:
@@ -58,7 +63,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
 
       for reservations in instances['Reservations']:
         for instance in reservations['Instances']:
-          res.append(self._process_vm(instance))
+          data.append(self._process_vm(instance))
 
       next_token = None
       if 'NextToken' in instances:
@@ -66,7 +71,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
       if not next_token:
         break
 
-    return res
+    return data
 
   def _get_instance_type(self, itype):
     if itype not in self.instance_types:
@@ -84,38 +89,6 @@ class CloudCollectorAmazonAWS(CloudCollector):
       raise Exception("Instance type '{}' not found".format(itype))
 
     return self.instance_types[itype]
-
-  def _get_storage_info(self):
-    storage = {}
-
-    vinfo = self.client.describe_volumes()
-
-    for volume in vinfo['Volumes']:
-      # XXX: sorting attachments for stable summing
-      attachments = newlist = sorted(volume['Attachments'], key=lambda k: k['InstanceId']) 
-      for idx in range(0, len(attachments)):
-        atch = volume['Attachments'][idx]
-        instance_id = atch['InstanceId']
-        if instance_id not in storage:
-          storage[instance_id] = {
-            "size": 0,
-            "storages": []
-          }
-
-        # XXX: only count storage size on one instance
-        if idx == 0:
-          storage[instance_id]["size"] += volume['Size'] * 1024
-
-        storage[instance_id]["storages"].append({
-        "id": volume['VolumeId'],
-        "name": atch['Device'],
-        "capacity": volume['Size'] * 1024,  # in MB
-        "free": None,
-        "type": volume['VolumeType'],
-        "encrypted": volume['Encrypted'],
-        "details": volume
-      })
-    return storage
 
   def _process_vm(self, rec):
     instance_type = rec["InstanceType"]
@@ -160,13 +133,13 @@ class CloudCollectorAmazonAWS(CloudCollector):
       "cpus": rec["CpuOptions"]["CoreCount"] or instance_def["cpu"],
       "memory": instance_def["memory"],
       "disks": None,	# TODO
-      "storage": self.storage[rec["InstanceId"]]["size"],
+      "storage": self.rd["ebs"][rec["InstanceId"]]["size"],
       "primary_ip":  rec.get("PrivateIpAddress") or rec.get("PublicIpAddress"),
       "primary_fqdn": rec.get("PrivateDnsName") or rec.get("PublicDnsName"),
       "public_ip": rec.get("PublicIpAddress"),
       "public_fqdn": rec.get("PublicDnsName"),
       "networks": networks,
-      "storages": self.storage[rec["InstanceId"]]["storages"],
+      "storages": self.rd["ebs"][rec["InstanceId"]]["storages"],
       #"storage_ebs_optimized": rec.get("EbsOptimized") or False,
       "monitoring": rec.get("Monitoring"),
       "owner": self.account_id,

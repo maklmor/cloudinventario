@@ -17,6 +17,8 @@ def setup(name, config, defaults, options):
 
 class CloudCollectorAmazonAWSMulti(CloudCollector):
 
+  COLLECTOR_PKG = "cloudinventario_amazon_aws_multi"
+
   def __init__(self, name, config, defaults, options):
     super().__init__(name, config, defaults, options)
 
