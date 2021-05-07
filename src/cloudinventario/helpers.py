@@ -117,10 +117,15 @@ class CloudInvetarioResourceManager:
 		self.client = client
 		self.cloud_col = cloud_col
 
-	def get_resource_data(self):
+	def get_resource_data(self, res_dep_list = None):
 		data = {}
-		
-		for res in self.res_list:
+
+		res_list = []
+		res_list.extend(res_dep_list or [])
+		res_list.extend(self.res_list or [])
+		res_list = list(set(res_list))
+
+		for res in res_list:
 			res_mod = importlib.import_module(self.cloud_col + ".res_collectors." + res)
 			res_obj = res_mod.get_resource_obj(self.client)
 			data[res] = res_obj.read_data()

@@ -55,7 +55,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
 
     self.resource_collectors = self.config.get('collect')
     manager = CloudInvetarioResourceManager(self.resource_collectors, self.client, self.COLLECTOR_PKG)
-    self.rd = manager.get_resource_data()
+    self.rd = manager.get_resource_data(["ebs"])
 
     next_token = ""
     while True:
