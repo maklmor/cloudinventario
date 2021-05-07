@@ -4,8 +4,7 @@ from pprint import pprint
 
 import boto3
 
-from cloudinventario.helpers import CloudCollector
-from cloudinventario.res_helpers import CloudInvetarioResourceManager
+from cloudinventario.helpers import CloudCollector, CloudInvetarioResourceManager
 
 # TEST MODE
 TEST = 0
@@ -14,6 +13,8 @@ def setup(name, config, defaults, options):
   return CloudCollectorAmazonAWS(name, config, defaults, options)
 
 class CloudCollectorAmazonAWS(CloudCollector):
+
+  COLLECTOR_PKG = "cloudinventario_amazon_aws"
 
   def __init__(self, name, config, defaults, options):
     super().__init__(name, config, defaults, options)
@@ -53,7 +54,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
     data = []
 
     self.resource_collectors = self.config.get('collect')
-    manager = CloudInvetarioResourceManager(self.resource_collectors, self.client)
+    manager = CloudInvetarioResourceManager(self.resource_collectors, self.client, self.COLLECTOR_PKG)
     self.rd = manager.get_resource_data()
 
     next_token = ""

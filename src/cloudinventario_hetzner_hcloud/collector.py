@@ -14,6 +14,8 @@ def setup(name, config, defaults, options):
 
 class CloudCollectorHetznerHCloud(CloudCollector):
 
+  COLLECTOR_PKG = "cloudinventario_hetzner_hcloud"
+
   def __init__(self, name, config, defaults, options):
     super().__init__(name, config, defaults, options)
 

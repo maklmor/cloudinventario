@@ -1,9 +1,9 @@
-from cloudinventario.res_helpers import CloudInvetarioAWSResource
+from cloudinventario.helpers import CloudInvetarioResource
 
 def get_resource_obj(client):
   return CloudInventarioEbs(client)
 
-class CloudInventarioEbs(CloudInvetarioAWSResource):
+class CloudInventarioEbs(CloudInvetarioResource):
 
   def __init__(self, client):
     super().__init__(client, "ebs storage")
