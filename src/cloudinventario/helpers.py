@@ -4,7 +4,7 @@ import datetime
 import json
 import logging
 import importlib
-#from pprint import pprint
+from pprint import pprint
 
 import cloudinventario.platform as platform
 
@@ -74,7 +74,8 @@ class CloudCollector:
                  "owner"]
     attrs = {**self.defaults, **attrs}
 
-    attr_json_keys = [ "networks", "storages", "tags" ]
+    attr_json_keys = [ "networks", "storages", "tags"]
+
     rec = {
       "type": rectype,
       "source": self.name,
@@ -91,7 +92,7 @@ class CloudCollector:
 #    for key in attr_tag_keys:
 #      data = attrs.get(key, [])
 #      rec[key] = ",".join(map(lambda k: "{}={}".format(k, data[k]), data.keys()))
-
+    
     for key in attr_json_keys:
       if not attrs.get(key):
         rec[key] = '[]'
@@ -106,41 +107,60 @@ class CloudCollector:
       rec["os"] = platform.get_os(rec.get("os"), rec.get("description"))
 
     if len(attrs) > 0:
-      rec["attributes"] = json.dumps(attrs)
-    rec["details"] = json.dumps(details, cls=CloudEncoder)
+      rec["attributes"] = json.dumps(attrs, default=str)
+    rec["details"] = json.dumps(details, cls=CloudEncoder, default=str)
     return rec
 
 class CloudInvetarioResourceManager:
 
-	def __init__(self, res_list, client, cloud_col):
-		self.res_list = res_list
-		self.client = client
-		self.cloud_col = cloud_col
+  def __init__(self, res_list, COLLECTOR_PKG, credentials):
+    self.res_list = res_list
+    self.COLLECTOR_PKG = COLLECTOR_PKG
+    self.credentials = credentials
 
-	def get_resource_data(self, res_dep_list = None):
-		data = {}
+  def get_resource_objs(self, res_dep_list = None):
+    obj_list = {}
 
-		res_list = []
-		res_list.extend(res_dep_list or [])
-		res_list.extend(self.res_list or [])
-		res_list = list(set(res_list))
+    res_list = []
+    res_list.extend(res_dep_list or [])
+    res_list.extend(self.res_list or [])
+    res_list = list(set(res_list))
 
-		for res in res_list:
-			res_mod = importlib.import_module(self.cloud_col + ".res_collectors." + res)
-			res_obj = res_mod.get_resource_obj(self.client)
-			data[res] = res_obj.read_data()
+    for res in res_list:
+      try:
+        mod_name = self.COLLECTOR_PKG + ".res_collectors." + res
+        res_mod = importlib.import_module(mod_name)
+      except Exception as e:
+        logging.error("Failed to load the following module:{}, reason: {}".format(mod_name, e))
+        continue
+      obj_list[res] = res_mod.get_resource_obj(self.credentials)
 
-		return data
+    return obj_list
 
 class CloudInvetarioResource():
 
-	def __init__(self, client, res_type):
-		self.client = client
-		self.res_type = res_type
+  def __init__(self, res_type, credentials):
+    self.res_type = res_type
+    self.credentials = credentials
+    self.client = self.get_client()
+    self.data = None
 
-	def read_data(self):
-		try:
-			data = self._read_data()
-			return data
-		except Exception:
-			logging.error("An error occured while reading data about following type of cloud resource: {}", self.res_type)
+  # def read_data(self):
+  #   logging.info("resource collector={}".format(self.res_type))
+  #   try:
+  #     data = self._read_data()
+  #     return data
+  #   except Exception as e:
+  #     logging.error("An error occured while reading data about following type of cloud resource: {}, reason: {}".format(self.res_type, e))
+      
+  def fetch(self):
+    try:
+      return self._fetch()
+    except Exception as e:
+      print(e)
+  
+  def get_client(self):
+    try:
+      return self._get_client()
+    except Exception as e:
+      logging.error("Failed to get client of following type of cloud resource: {}, reason: {}".format(self.res_type, e))
