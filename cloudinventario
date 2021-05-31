@@ -59,7 +59,6 @@ def collect(data):
      if inventory is not None:
         logging.info("storing data for name={}".format(name))
         cinv.store(inventory)
-        # pprint(inventory)
         setproctitle.setproctitle(proctitle)
         return True
      else:

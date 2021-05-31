@@ -49,7 +49,13 @@ class CloudCollectorAmazonAWS(CloudCollector):
                                   aws_session_token = session_token, region_name = region)
 
     self.instance_types = {}
-    self.res_objects = self._get_res_objects([access_key, secret_key, session_token, region, self.account_id])
+    self.res_objects = self._get_res_objects({
+      "access_key": access_key,
+       "secret_key": secret_key,
+       "session_token": session_token,
+       "region": region,
+       "account_id": self.account_id
+       })
     self.ebs = self.res_objects.pop("ebs").fetch()
   
     return True
@@ -72,11 +78,10 @@ class CloudCollectorAmazonAWS(CloudCollector):
         break
     
     for resource in self.res_objects.values():
+      # print("resss", resource.res_type)
       for instance in resource.fetch():
-        # pprint(instance)
         data.append(self.new_record(resource.res_type, instance[0], instance[1]))
 
-    # pprint(data)
     return data
 
   def _get_res_objects(self, credentials):
@@ -162,7 +167,6 @@ class CloudCollectorAmazonAWS(CloudCollector):
         "tags": tags 
     }
 
-    # pprint(vm_data)
     return self.new_record('vm', vm_data, rec)
 
   def _logout(self):

@@ -11,45 +11,24 @@ class CloudInventarioElb(CloudInvetarioResource):
   def __init__(self, credentials):
     super().__init__("elb", credentials)
 
-  # def _read_data(self):
-  #   elb_info = self.client.describe_load_balancers()
-  #   data = {} # instance_id: load_balancers
-
-  #   for balancer in elb_info['LoadBalancerDescriptions']:
-  #     ec2_instances  = list( map(lambda x: x['InstanceId'], balancer['Instances']))
-
-  #     for instance in ec2_instances:
-  #       health_info = self.client.describe_instance_health(LoadBalancerName= balancer['LoadBalancerName'], Instances= [{'InstanceId': instance}])
-  #       port_list = dict( map(lambda x: (x['Listener']['LoadBalancerPort'], x['Listener']['Protocol']), balancer['ListenerDescriptions']))
-  #       if not data.get(instance):
-  #         data[instance] = [{
-  #           "name": balancer['LoadBalancerName'],
-  #           "listener ports": port_list,
-  #           "scheme": balancer['Scheme'],
-  #           "health of connection": health_info['InstanceStates'][0]['State'],
-  #           "health of connection reason": health_info['InstanceStates'][0]['ReasonCode'],
-  #           "details": balancer
-  #         }]
-  #   return data
-
   def _get_client(self):
-    client = boto3.client('elb', aws_access_key_id = self.credentials[0], aws_secret_access_key = self.credentials[1],
-                                  aws_session_token = self.credentials[2], region_name = self.credentials[3])
+    client = boto3.client('elb', aws_access_key_id = self.credentials["access_key"], aws_secret_access_key = self.credentials["secret_key"],
+                                  aws_session_token = self.credentials["session_token"], region_name = self.credentials["region"])
     return client
 
   def _fetch(self):
     data = []
+    paginator = self.client.get_paginator('describe_load_balancers')
 
-    next_marker = ""
-    while True:
-      load_balancers = self.client.describe_load_balancers(PageSize=100)
+    for page in paginator.paginate():
+      page = self.client.describe_load_balancers(PageSize=100)
 
-      for lb in load_balancers['LoadBalancerDescriptions']:
+      for lb in page['LoadBalancerDescriptions']:
         data.append((self._process_resource(lb), lb))
       
       next_marker = None
-      if 'NextMarker' in load_balancers:
-         next_marker = load_balancers['NextMarker']
+      if 'NextMarker' in page:
+         next_marker = page['NextMarker']
       if not next_marker:
         break
 
@@ -58,22 +37,34 @@ class CloudInventarioElb(CloudInvetarioResource):
   def _process_resource(self, balancer):
     health_info = self.client.describe_instance_health(LoadBalancerName=balancer['LoadBalancerName'])
     health_states = {}
-    for instance in health_info['InstanceStates']:
-      health_states[instance['InstanceId']] = {
-        "state": instance['State'],
-        "reason": instance['ReasonCode']
-      }
+    status = "unknown"
 
+    for instance in health_info['InstanceStates']:
+      state = instance['State']
+      if state == "InService": # if any in service, service is on
+        status = "on"
+      elif status == "unknown" and state == "OutOfService":
+        status = "off"
+      elif status == "unknown" and state == "Unknown":
+        status = "unknown"
+
+      health_states[instance['InstanceId']] = {
+        "state": instance['State']
+      }
+    
     data = {
       "created": balancer['CreatedTime'],
       "name": balancer['LoadBalancerName'],
       "cluster": balancer['AvailabilityZones'],
       "id": balancer['CanonicalHostedZoneNameID'],
+      "instances": health_states,
       "public_fqdn": balancer['CanonicalHostedZoneName'],
-      "owner": self.credentials[4],
+      "owner": self.credentials["account_id"],
       "status": health_states,
+      "is_on": True if status == "on" else False,
       "scheme": balancer['Scheme'],
-      "subnets": balancer['Subnets']
+      "subnets": balancer['Subnets'],
+      "details": balancer
     }
 
     for key, value in data.items():
