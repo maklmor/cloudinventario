@@ -70,7 +70,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
       for reservations in instances['Reservations']:
         for instance in reservations['Instances']:
           data.append(self._process_vm(instance))
-      
+
       next_token = None
       if 'NextToken' in instances:
          next_token = instances['NextToken']

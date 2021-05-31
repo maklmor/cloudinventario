@@ -75,7 +75,6 @@ class CloudCollector:
     attrs = {**self.defaults, **attrs}
 
     attr_json_keys = [ "networks", "storages", "tags"]
-
     rec = {
       "type": rectype,
       "source": self.name,
@@ -92,7 +91,7 @@ class CloudCollector:
 #    for key in attr_tag_keys:
 #      data = attrs.get(key, [])
 #      rec[key] = ",".join(map(lambda k: "{}={}".format(k, data[k]), data.keys()))
-    
+
     for key in attr_json_keys:
       if not attrs.get(key):
         rec[key] = '[]'
@@ -144,14 +143,6 @@ class CloudInvetarioResource():
     self.credentials = credentials
     self.client = self.get_client()
     self.data = None
-
-  # def read_data(self):
-  #   logging.info("resource collector={}".format(self.res_type))
-  #   try:
-  #     data = self._read_data()
-  #     return data
-  #   except Exception as e:
-  #     logging.error("An error occured while reading data about following type of cloud resource: {}, reason: {}".format(self.res_type, e))
       
   def fetch(self):
     try:

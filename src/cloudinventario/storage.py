@@ -138,7 +138,7 @@ class InventoryStorage:
 
      if len(sources) == 0:
        return False
-     
+
      # store data
      with self.engine.begin() as conn:
        conn.execute(self.source_table.insert(), sources_save)
