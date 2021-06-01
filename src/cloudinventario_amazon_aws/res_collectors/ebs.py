@@ -1,16 +1,26 @@
+import boto3
+
 from cloudinventario.helpers import CloudInvetarioResource
 
-def get_resource_obj(client):
-  return CloudInventarioEbs(client)
+def get_resource_obj(credentials):
+  return CloudInventarioEbs(credentials)
 
 class CloudInventarioEbs(CloudInvetarioResource):
 
-  def __init__(self, client):
-    super().__init__(client, "ebs storage")
+  def __init__(self, credentials):
+    super().__init__("ebs", credentials)
 
-  def _read_data(self):
-      storage = {}
-      vinfo = self.client.describe_volumes()
+  def _get_client(self):
+    client = boto3.client('ec2', aws_access_key_id = self.credentials["access_key"], aws_secret_access_key = self.credentials["secret_key"],
+                                  aws_session_token = self.credentials["session_token"], region_name = self.credentials["region"])
+    return client
+
+  def _fetch(self):
+    storage = {}
+    
+    next_token = ""
+    while True:
+      vinfo = self.client.describe_volumes(MaxResults=100, NextToken=next_token)
 
       for volume in vinfo['Volumes']:
         # XXX: sorting attachments for stable summing
@@ -37,5 +47,11 @@ class CloudInventarioEbs(CloudInvetarioResource):
           "encrypted": volume['Encrypted'],
           "details": volume
         })
-      return storage
       
+      next_token = None
+      if 'NextToken' in vinfo:
+         next_token = vinfo['NextToken']
+      if not next_token:
+        break
+      
+    return storage
