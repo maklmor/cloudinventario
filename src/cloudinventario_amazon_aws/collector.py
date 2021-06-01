@@ -78,7 +78,6 @@ class CloudCollectorAmazonAWS(CloudCollector):
         break
     
     for resource in self.res_objects.values():
-      # print("resss", resource.res_type)
       for instance in resource.fetch():
         data.append(self.new_record(resource.res_type, instance[0], instance[1]))
 
