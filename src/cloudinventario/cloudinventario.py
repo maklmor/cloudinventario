@@ -48,10 +48,9 @@ class CloudInventario:
      inventory = None
      try:
        instance = self.loadCollector(collector, options)
-
-       if instance.login():
-         inventory = instance.fetch()
-         instance.logout()
+       instance.login()
+       inventory = instance.fetch()
+       instance.logout()
      except Exception as e:
        logging.error("Exception while processing collector={}".format(collector))
        raise

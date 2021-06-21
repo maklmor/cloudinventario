@@ -45,20 +45,14 @@ class CloudCollectorAmazonAWS(CloudCollector):
       self.account_id = ident['Account']
 
     logging.info("logging in AWS account_id={}, region={}".format(self.account_id, region))
-    self.client = boto3.client('ec2', aws_access_key_id = access_key, aws_secret_access_key = secret_key,
+    self.session = boto3.Session(aws_access_key_id = access_key, aws_secret_access_key = secret_key,
                                   aws_session_token = session_token, region_name = region)
+    self.client = self.session.client('ec2')
 
     self.instance_types = {}
-    self.res_objects = self._get_res_objects({
-      "access_key": access_key,
-       "secret_key": secret_key,
-       "session_token": session_token,
-       "region": region,
-       "account_id": self.account_id
-       })
-    self.ebs = self.res_objects.pop("ebs").fetch()
-  
-    return True
+    # self.ebs = self.res_objects.pop("ebs").fetch()
+
+    return self.session
 
   def _fetch(self, collect):
     data = []
@@ -76,17 +70,12 @@ class CloudCollectorAmazonAWS(CloudCollector):
          next_token = instances['NextToken']
       if not next_token:
         break
-    
-    for resource in self.res_objects.values():
-      for instance in resource.fetch():
-        data.append(self.new_record(resource.res_type, instance[0], instance[1]))
 
     return data
 
-  def _get_res_objects(self, credentials):
-    self.res_list = self.config.get('collect')
-    resource_manager = CloudInvetarioResourceManager(self.res_list, self.COLLECTOR_PKG, credentials)
-    res_obj_list = resource_manager.get_resource_objs(["ebs"])
+  def _load_res_collectors(self, res_list, tasks):
+    self.resource_manager = CloudInvetarioResourceManager(res_list, self.COLLECTOR_PKG, self)
+    res_obj_list = self.resource_manager.get_resource_objs(["ebs"])
     return res_obj_list
 
   def _get_instance_type(self, itype):
@@ -150,25 +139,34 @@ class CloudCollectorAmazonAWS(CloudCollector):
         "cpus": rec["CpuOptions"]["CoreCount"] or instance_def["cpu"],
         "memory": instance_def["memory"],
         "disks": None,	# TODO
-        "storage": self.ebs[rec["InstanceId"]]["size"],
+        "storage": self.res_collectors["ebs"].get_data()[rec["InstanceId"]]["size"],
         "primary_ip":  rec.get("PrivateIpAddress") or rec.get("PublicIpAddress"),
         "primary_fqdn": rec.get("PrivateDnsName") or rec.get("PublicDnsName"),
         "public_ip": rec.get("PublicIpAddress"),
         "public_fqdn": rec.get("PublicDnsName"),
         "networks": networks,
-        "storages": self.ebs[rec["InstanceId"]]["storages"],
+        "storages": self.res_collectors["ebs"].get_data()[rec["InstanceId"]]["storages"],
         #"storage_ebs_optimized": rec.get("EbsOptimized") or False,
         "monitoring": rec.get("Monitoring"),
         "owner": self.account_id,
         "os": rec.get("Platform"),
         "status": rec["State"]["Name"],
         "is_on": (rec["State"]["Name"] == "running" and 1 or 0),
-        "tags": tags 
+        "tags": tags
     }
 
     return self.new_record('vm', vm_data, rec)
 
+  def _get_res_fetch_order(self):
+    fetch_order = []
+    dep = self.resource_manager.dep_classif
+
+    fetch_order.extend(dep["dependency_only"])
+    fetch_order.extend(dep["dependency_not_only"])
+    fetch_order.extend(self.res)
+    return fetch_order
+
   def _logout(self):
     self.client = None
 
-  
+
