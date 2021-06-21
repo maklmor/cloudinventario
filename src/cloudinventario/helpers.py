@@ -56,7 +56,6 @@ class CloudCollector:
         logging.error("Failed to pass session to the following resource: {}".format(resource))
         raise
 
-
   def fetch(self, collect = None):
     self.__pre_request()
     try:
@@ -82,7 +81,6 @@ class CloudCollector:
     except Exception:
       logging.error("Failed to fetch the following resource collector: {}".format(res))
       raise
-
 
   def logout(self):
     self.__pre_request()
@@ -166,7 +164,6 @@ class CloudCollector:
           rec[key] = json.dumps(value, default=str)
         else:
           rec[key] = value
-
 
     if "os_family" not in attrs.keys() and rec.get("os"):
       rec["os_family"] = platform.get_os_family(rec.get("os"), rec.get("description"))

@@ -73,8 +73,4 @@ class CloudInventarioElb(CloudInvetarioResource):
       "subnets": balancer['Subnets']
     }
 
-    # for key, value in data.items():
-    #   if type(value) in [dict, list]:
-    #     data[key] = json.dumps(value, default=str)
-
     return self.collector.new_record(self.res_type, data, balancer)

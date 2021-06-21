@@ -50,7 +50,6 @@ class CloudCollectorAmazonAWS(CloudCollector):
     self.client = self.session.client('ec2')
 
     self.instance_types = {}
-    # self.ebs = self.res_objects.pop("ebs").fetch()
 
     return self.session
 
