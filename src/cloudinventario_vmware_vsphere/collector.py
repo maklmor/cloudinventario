@@ -22,6 +22,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
 
     self.client = None
     self.maxDepth = 10
+    self.vm2cluster = {}
 
   def _login(self):
     host = self.config['host']
@@ -51,12 +52,12 @@ class CloudCollectorVMWareVSphere(CloudCollector):
   def _fetch(self, collect):
     res = []
 
-    content = self.client.RetrieveContent()
+    self.content = self.client.RetrieveContent()
 
     # collect networks (DistributedVirtualPortgroup)
     logging.info("collecting networks")
     self.networks = {}
-    for child in content.rootFolder.childEntity:
+    for child in self.content.rootFolder.childEntity:
       if hasattr(child, 'network'):
         for net in child.network:
           if isinstance(net, vim.DistributedVirtualPortgroup):
@@ -67,7 +68,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
 
     # collect hosts
     logging.info("collecting clusters")
-    for child in content.rootFolder.childEntity:
+    for child in self.content.rootFolder.childEntity:
       if hasattr(child, 'hostFolder'):
         for cluster in child.hostFolder.childEntity:
           if isinstance(cluster, vim.ComputeResource):
@@ -81,7 +82,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
 
     # collect VMs
     logging.info("collecting VApps and VMs")
-    for child in content.rootFolder.childEntity:
+    for child in self.content.rootFolder.childEntity:
       #print("child = {}".format(child.name))
 
       if hasattr(child, 'vmFolder'):
@@ -96,13 +97,22 @@ class CloudCollectorVMWareVSphere(CloudCollector):
   def __process_cluster(self, cluster):
     name = cluster.name
     logging.debug("new cluster name={}".format(name))
+
+    # collect virtual machines
+    obj_view = self.content.viewManager.CreateContainerView(cluster, [vim.VirtualMachine], True)
+    vm_list = obj_view.view
+    obj_view.Destroy()
+    for vm in vm_list:
+      self.vm2cluster[vm._moId] = name
+
+    # collect cluster data
     cs = cluster.summary
     rec = {
     	"name": name,
     	"id": cluster._moId,
     	"cpus": cs.numCpuCores,
     	"threads": cs.numCpuThreads,
-    	"hosts": cs.numCpuThreads,
+    	"hosts": cs.numHosts,
     	"memory": cs.totalMemory // (1024 * 1024)
     }
 
@@ -119,6 +129,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       res.extend(self.__process_host(host))
       if TEST:
         break
+
     return res
 
   def __process_host(self, host):
@@ -285,6 +296,15 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     name = vm.name
     logging.debug("new vm name={}".format(name))
     vs = vm.summary
+
+    vs_runtime_host_name = None
+    vs_runtime_cluster_name = None
+    try:
+      vs_runtime_host_name = vm.runtime.host.summary.name
+      vs_runtime_cluster_name = vs.runtime.host.parent.name
+    except:
+      pass
+
     rec = {
       "name": vm.name,
       "config_name": vs.config.name,
@@ -301,14 +321,17 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       "primary_ip": ((vs.guest.ipAddress and ":" not in vs.guest.ipAddress) and vs.guest.ipAddress or None), # no ipv6 here
       "status": vs.runtime.powerState,
       "is_on": (vs.runtime.powerState == "poweredOn" and 1 or 0),
-      "host": vs.runtime.host.name,
+      "host": vs_runtime_host_name,
       "project": parent,
       "vapp": parent,
       "datastore": [ ds.datastore.name for ds in vm.storage.perDatastoreUsage ],
-      "cluster": vs.runtime.host.parent.name,
+      "cluster": vs_runtime_cluster_name or self.vm2cluster.get(vm._moId),
       #"management_ip": vs.runtime.host.parent.summary.managementServerIp	# TODO: need this
       #"tags": vm.tags,
     }
+
+    if vs.config.template:
+      rec['template'] = 1
 
     # storage
     storage = 0
