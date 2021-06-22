@@ -9,15 +9,13 @@ from cloudinventario.helpers import CloudCollector, CloudInvetarioResourceManage
 # TEST MODE
 TEST = 0
 
-def setup(name, config, defaults, options):
-  return CloudCollectorAmazonAWS(name, config, defaults, options)
+def setup(name, config, defaults, options, collector_pkg):
+  return CloudCollectorAmazonAWS(name, config, defaults, options, collector_pkg)
 
 class CloudCollectorAmazonAWS(CloudCollector):
 
-  COLLECTOR_PKG = "cloudinventario_amazon_aws"
-
-  def __init__(self, name, config, defaults, options):
-    super().__init__(name, config, defaults, options)
+  def __init__(self, name, config, defaults, options, collector_pkg):
+    super().__init__(name, config, defaults, options, collector_pkg)
 
   def _config_keys():
     return {
@@ -72,11 +70,6 @@ class CloudCollectorAmazonAWS(CloudCollector):
 
     return data
 
-  def _load_res_collectors(self, res_list, tasks):
-    self.resource_manager = CloudInvetarioResourceManager(res_list, self.COLLECTOR_PKG, self)
-    res_obj_list = self.resource_manager.get_resource_objs(["ebs"])
-    return res_obj_list
-
   def _get_instance_type(self, itype):
     if itype not in self.instance_types:
       types = self.client.describe_instance_types(InstanceTypes = [ itype ])
@@ -93,6 +86,9 @@ class CloudCollectorAmazonAWS(CloudCollector):
       raise Exception("Instance type '{}' not found".format(itype))
 
     return self.instance_types[itype]
+
+  def _get_dep_list(self):
+    return ["ebs"]
 
   def _process_vm(self, rec):
     instance_type = rec["InstanceType"]
@@ -120,6 +116,14 @@ class CloudCollectorAmazonAWS(CloudCollector):
           "connected": True
         })
 
+    storage = None
+    storages = None
+    try:
+      storage = self.res_collectors["ebs"].get_data()[rec["InstanceId"]]["size"]
+      storages = self.res_collectors["ebs"].get_data()[rec["InstanceId"]]["storages"]
+    except Exception:
+      storages = []
+
     tags = {}
     for tag in rec.get("Tags", []):
       tags[ tag["Key"] ] = tag["Value"]
@@ -138,13 +142,13 @@ class CloudCollectorAmazonAWS(CloudCollector):
         "cpus": rec["CpuOptions"]["CoreCount"] or instance_def["cpu"],
         "memory": instance_def["memory"],
         "disks": None,	# TODO
-        "storage": self.res_collectors["ebs"].get_data()[rec["InstanceId"]]["size"],
+        "storage": storage,
         "primary_ip":  rec.get("PrivateIpAddress") or rec.get("PublicIpAddress"),
         "primary_fqdn": rec.get("PrivateDnsName") or rec.get("PublicDnsName"),
         "public_ip": rec.get("PublicIpAddress"),
         "public_fqdn": rec.get("PublicDnsName"),
         "networks": networks,
-        "storages": self.res_collectors["ebs"].get_data()[rec["InstanceId"]]["storages"],
+        "storages": storages,
         #"storage_ebs_optimized": rec.get("EbsOptimized") or False,
         "monitoring": rec.get("Monitoring"),
         "owner": self.account_id,
@@ -155,15 +159,6 @@ class CloudCollectorAmazonAWS(CloudCollector):
     }
 
     return self.new_record('vm', vm_data, rec)
-
-  def _get_res_fetch_order(self):
-    fetch_order = []
-    dep = self.resource_manager.dep_classif
-
-    fetch_order.extend(dep["dependency_only"])
-    fetch_order.extend(dep["dependency_not_only"])
-    fetch_order.extend(self.res)
-    return fetch_order
 
   def _logout(self):
     self.client = None

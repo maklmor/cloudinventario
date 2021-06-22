@@ -18,11 +18,13 @@ class CloudEncoder(json.JSONEncoder):
 class CloudCollector:
   """Cloud collector."""
 
-  def __init__(self, name, config, defaults, options):
+  def __init__(self, name, config, defaults, options, collector_pkg):
     self.name = name
     self.config = config
     self.defaults = defaults
     self.options = options
+    self.collector_pkg = collector_pkg
+    self.dep_list = self._get_dep_list()
     self.allow_self_signed = options.get('allow_self_signed', config.get('allow_self_signed', False))
     if self.allow_self_signed:
       requests.packages.urllib3.disable_warnings()
@@ -50,7 +52,7 @@ class CloudCollector:
   def resource_login(self, session):
     for resource, res_collector in self.res_collectors.items():
       try:
-        logging.info("Passing session to: {}".format(resource))
+        logging.debug("Passing session to: {}".format(resource))
         res_collector.login(session)
       except Exception:
         logging.error("Failed to pass session to the following resource: {}".format(resource))
@@ -115,13 +117,22 @@ class CloudCollector:
 
   def load_res_collectors(self, res_list, tasks):
     try:
-      res_collectors = self._load_res_collectors(res_list, tasks)
+      self.resource_manager = CloudInvetarioResourceManager(res_list, self.collector_pkg, self)
+      res_collectors = self.resource_manager.get_resource_objs(self.dep_list)
       return res_collectors
     except:
       raise
 
-  def new_record(self, rectype, attrs, details):
+  def get_dep_list(self):
+    try:
+      logging.debug("Getting dependencies for the following module: {}".format(self.name))
+      dep_list = self._get_dep_list() or []
+      return dep_list
+    except Exception:
+      logging.error("Failed to get dependencies for the following collector: {}".format(self.name))
+      raise
 
+  def new_record(self, rectype, attrs, details):
     attr_keys = ["created",
                  "name", "project", "location", "description", "id",
                  "cpus", "memory", "disks", "storage", "primary_ip",
@@ -208,7 +219,7 @@ class CloudInvetarioResourceManager:
     for res in res_list:
       try:
         mod_name = self.COLLECTOR_PKG + ".res_collectors." + res
-        logging.info("Importing module: {}".format(mod_name))
+        logging.debug("Importing module: {}".format(mod_name))
         res_mod = importlib.import_module(mod_name)
       except Exception as e:
         logging.error("Failed to load the following module:{}, reason: {}".format(mod_name, e))
@@ -234,7 +245,7 @@ class CloudInvetarioResource():
 
   def fetch(self):
     try:
-      logging.info("Fetching the following type of resource: {}".format(self.res_type))
+      logging.debug("Fetching the following type of resource: {}".format(self.res_type))
       self.data = self._fetch()
       return self.data
     except Exception:
@@ -243,7 +254,7 @@ class CloudInvetarioResource():
 
   def process_resource(self, resource_data):
     try:
-      logging.info("Processing the following type of resource: {}".format(self.res_type))
+      logging.debug("Processing the following type of resource: {}".format(self.res_type))
       data = self._process_resource(resource_data)
       return data
     except Exception:
