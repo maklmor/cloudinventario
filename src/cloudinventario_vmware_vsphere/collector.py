@@ -407,7 +407,8 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       "networks": rec.get("networks"),
       "os": rec["os"],
       "status": rec["status"],
-      "is_on": rec["is_on"]
+      "is_on": rec["is_on"],
+      "template": int(rec.get("template") or 0)
     }, rec))
     return res
 
