@@ -3,75 +3,49 @@ from pprint import pprint
 
 from cloudinventario.helpers import CloudInvetarioResource
 
-def get_resource_obj(credentials):
-  return CloudInventarioS3(credentials)
+def get_resource_obj(collector):
+  return CloudInventarioS3(collector)
 
 class CloudInventarioS3(CloudInvetarioResource):
 
-  def __init__(self, credentials):
-    super().__init__("s3", credentials)
+  def __init__(self, collector):
+    super().__init__("s3", collector)
+
+  def _login(self, session):
+    self.session = session
+    self.client = self.get_client()
 
   def _get_client(self):
-    client = boto3.client('s3', aws_access_key_id = self.credentials["access_key"], aws_secret_access_key = self.credentials["secret_key"],
-                                  aws_session_token = self.credentials["session_token"], region_name = self.credentials["region"])
+    client = self.session.client('s3')
     return client
 
   def _fetch(self):
     data = []
-    paginator = self.client.get_paginator('describe_load_balancers')
-    response_iterator = paginator.paginate()
 
-    marker = None
-    while True:
-      if marker:
-        response_iterator = self.client.describe_load_balancers(Marker=marker)
-      else:
-        response_iterator = self.client.describe_load_balancers()
-
-      for lb in response_iterator['LoadBalancerDescriptions']:
-        data.append((self._process_resource(lb), lb))
-
-      try:
-        marker = response_iterator['Marker']
-      except Exception:
-        break
+    for bucket in self.client.list_buckets()['Buckets']:
+      data.append(self._process_resource(bucket['Name']))
 
     return data
 
-  def _process_resource(self, balancer):
-    health_info = self.client.describe_instance_health(LoadBalancerName=balancer['LoadBalancerName'])
-    health_states = {}
-    status = "unknown"
-
-    for instance in health_info['InstanceStates']:
-      state = instance['State']
-      if state == "InService": # if any in service, service is on
-        status = "on"
-      elif status == "unknown" and state == "OutOfService":
-        status = "off"
-      elif status == "unknown" and state == "Unknown":
-        status = "unknown"
-
-      health_states[instance['InstanceId']] = {
-        "state": instance['State']
-      }
+  def _process_resource(self, bucket_name):
+    acl = self.client.get_bucket_acl(Bucket=bucket_name)
+    location = self.client.get_bucket_location(Bucket=bucket_name)
+    ownership_controls = self.client.get_bucket_ownership_controls(Bucket=bucket_name)
+    policy_status = self.client.get_bucket_policy_status(Bucket=bucket_name)
+    versioning = self.client.get_bucket_versioning(Bucket=bucket_name)
+    website = self.client.get_bucket_website(Bucket=bucket_name)
+    website.pop('ResponseMetadata')
 
     data = {
-      "created": balancer['CreatedTime'],
-      "name": balancer['LoadBalancerName'],
-      "cluster": balancer['AvailabilityZones'],
-      "id": balancer['CanonicalHostedZoneNameID'],
-      "instances": health_states,
-      "public_fqdn": balancer['CanonicalHostedZoneName'],
-      "owner": self.credentials["account_id"],
-      "status": health_states,
-      "is_on": True if status == "on" else False,
-      "scheme": balancer['Scheme'],
-      "subnets": balancer['Subnets']
+      "acl": acl['Grants'],
+      "location": location['LocationConstraint'],
+      "ownership_controls": ownership_controls['OwnershipControls'],
+      "policy_status": policy_status['PolicyStatus'],
+      "versioning": versioning['Status'],
+      "website": website,
+      "name": bucket_name,
+      "id": bucket_name,
+      "owner": acl['Owner']['ID']
     }
 
-    for key, value in data.items():
-      if type(value) in [dict, list]:
-        data[key] = json.dumps(value, default=str)
-
-    return data
+    return self.collector.new_record(self.res_type, data, data)
