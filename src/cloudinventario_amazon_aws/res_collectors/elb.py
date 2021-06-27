@@ -3,17 +3,20 @@ from pprint import pprint
 
 from cloudinventario.helpers import CloudInvetarioResource
 
-def get_resource_obj(credentials):
-  return CloudInventarioElb(credentials)
+def get_resource_obj(collector):
+  return CloudInventarioElb(collector)
 
 class CloudInventarioElb(CloudInvetarioResource):
 
-  def __init__(self, credentials):
-    super().__init__("elb", credentials)
+  def __init__(self, collector):
+    super().__init__("elb", collector)
+
+  def _login(self, session):
+    self.session = session
+    self.client = self.get_client()
 
   def _get_client(self):
-    client = boto3.client('elb', aws_access_key_id = self.credentials["access_key"], aws_secret_access_key = self.credentials["secret_key"],
-                                  aws_session_token = self.credentials["session_token"], region_name = self.credentials["region"])
+    client = self.session.client('elb')
     return client
 
   def _fetch(self):
@@ -29,7 +32,7 @@ class CloudInventarioElb(CloudInvetarioResource):
         response_iterator = self.client.describe_load_balancers()
 
       for lb in response_iterator['LoadBalancerDescriptions']:
-        data.append((self._process_resource(lb), lb))
+        data.append(self.process_resource(lb))
 
       try:
         marker = response_iterator['Marker']
@@ -63,15 +66,11 @@ class CloudInventarioElb(CloudInvetarioResource):
       "id": balancer['CanonicalHostedZoneNameID'],
       "instances": health_states,
       "public_fqdn": balancer['CanonicalHostedZoneName'],
-      "owner": self.credentials["account_id"],
+      "owner": self.collector.account_id,
       "status": health_states,
       "is_on": True if status == "on" else False,
       "scheme": balancer['Scheme'],
       "subnets": balancer['Subnets']
     }
 
-    for key, value in data.items():
-      if type(value) in [dict, list]:
-        data[key] = json.dumps(value, default=str)
-
-    return data
+    return self.collector.new_record(self.res_type, data, balancer)

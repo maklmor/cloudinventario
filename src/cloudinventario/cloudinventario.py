@@ -37,7 +37,7 @@ class CloudInventario:
      mod_name = re.sub(r'-', '_', mod_name)
 
      mod = importlib.import_module(COLLECTOR_PREFIX + '_' + mod_name + '.collector')
-     mod_instance = mod.setup(collector, mod_cfg['config'], mod_cfg.get('default', {}), options or {})
+     mod_instance = mod.setup(collector, mod_cfg['config'], mod_cfg.get('default', {}), options or {}, COLLECTOR_PREFIX + '_' + mod_name)
      return mod_instance
 
    def collect(self, collector, options = None):
@@ -48,10 +48,9 @@ class CloudInventario:
      inventory = None
      try:
        instance = self.loadCollector(collector, options)
-
-       if instance.login():
-         inventory = instance.fetch()
-         instance.logout()
+       instance.login()
+       inventory = instance.fetch()
+       instance.logout()
      except Exception as e:
        logging.error("Exception while processing collector={}".format(collector))
        raise
