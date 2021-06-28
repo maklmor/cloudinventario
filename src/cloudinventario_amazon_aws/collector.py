@@ -116,8 +116,8 @@ class CloudCollectorAmazonAWS(CloudCollector):
         })
 
     # TODO: avoid duplicate counting
-    storage = None
-    storages = None
+    storage = 0
+    storages = []
     ebs_data = self.get_resource_data("ebs")
     if ebs_data and rec["InstanceId"] in ebs_data:
       storage = ebs_data[rec["InstanceId"]]["size"]

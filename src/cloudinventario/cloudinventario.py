@@ -32,18 +32,23 @@ class CloudInventario:
      mod_cfg = self.collectorConfig(collector)
 
      mod_name = mod_cfg['module']
+     mod_defaults = mod_cfg.get('default', {})
+     return CloudInventario.loadCollectorModule(mod_name, collector, mod_cfg['config'], mod_defaults, options)
+
+   @staticmethod
+   def loadCollectorModule(mod_name, collector, config, defaults = None, options = None):
      mod_name = re.sub(r'[/.]', '_', mod_name) # basic safety, should throw error
      mod_name = re.sub(r'_', '__', mod_name)
      mod_name = re.sub(r'-', '_', mod_name)
 
      mod_pkg = COLLECTOR_PREFIX + '_' + mod_name
-     mod_config = {**mod_cfg['config'], **{
+     config = {**config, **{
         '_collector_pkg': mod_pkg,
-        '_resources': mod_cfg.get('collect', []),
+        '_resources': config.get('collect', [])
      }}
 
      mod = importlib.import_module(mod_pkg + '.collector')
-     mod_instance = mod.setup(collector, mod_config, mod_cfg.get('default', {}), options or {})
+     mod_instance = mod.setup(collector, config, defaults, options or {})
      return mod_instance
 
    def collect(self, collector, options = None):

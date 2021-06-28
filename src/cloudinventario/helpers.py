@@ -28,7 +28,7 @@ class CloudCollector:
     self.dependencies = self._get_dependencies()
 
     self.resource_manager = None
-    self.resource_collectors = self.load_resource_collectors(self.resources) or []
+    self.resource_collectors = self.load_resource_collectors(self.resources) or {}
 
     self.allow_self_signed = options.get('allow_self_signed', config.get('allow_self_signed', False))
     if self.allow_self_signed:
@@ -45,6 +45,8 @@ class CloudCollector:
     self.__pre_request()
     try:
       session = self._login()
+      if session is None or session is False:
+        raise Exception("Login failed")
       self.resource_login(session)
     except:
       logging.error("Failed to login the following collector: {}".format(self.name))
@@ -205,11 +207,11 @@ class CloudInvetarioResourceManager:
       "not_dependency": set(),
     }
 
-  def get_resource_objs(self, res_dep_list = None):
+  def get_resource_objs(self, res_dep_list = []):
     obj_list = {}
 
     # sorting based on whether a resource needs priority in fetching or not
-    res_list = list(set(res_dep_list + self.res_list))
+    res_list = list(set((res_dep_list or []) + self.res_list))
     for resource in res_list:
       if resource in res_dep_list:
         self.dep_classif["dependency"].add(resource)

@@ -6,8 +6,9 @@ import boto3
 import boto3.session
 from botocore.exceptions import ClientError
 
+from cloudinventario.cloudinventario import CloudInventario
 from cloudinventario.helpers import CloudCollector
-from cloudinventario_amazon_aws.collector import CloudCollectorAmazonAWS
+#from cloudinventario_amazon_aws.collector import CloudCollectorAmazonAWS
 
 # TEST MODE
 TEST = 0
@@ -52,9 +53,9 @@ class CloudCollectorAmazonAWSMulti(CloudCollector):
     self.clients = []
     for cred in self.creds:
       account_id = cred['account_id'] or 0
-      handle = CloudCollectorAmazonAWS("{}@{}".format(self.name, account_id),
-                                         cred, self.defaults, self.options)
-      handle._login()
+      name = "{}@{}".format(self.name, account_id)
+      handle = CloudInventario.loadCollectorModule("amazon-aws", name, cred, self.defaults, self.options)
+      handle.login()
       self.clients.append({
         "account_id": account_id,
         "handle": handle
@@ -103,7 +104,7 @@ class CloudCollectorAmazonAWSMulti(CloudCollector):
     res = []
     for client in self.clients:
       try:
-        data = client['handle']._fetch(collect)
+        data = client['handle'].fetch(collect)
         res.extend(data)
       except Exception as e:
         logging.error("Exception while processing account={}".format(client['account_id']))
