@@ -9,13 +9,13 @@ from cloudinventario.helpers import CloudCollector, CloudInvetarioResourceManage
 # TEST MODE
 TEST = 0
 
-def setup(name, config, defaults, options, collector_pkg):
-  return CloudCollectorAmazonAWS(name, config, defaults, options, collector_pkg)
+def setup(name, config, defaults, options):
+  return CloudCollectorAmazonAWS(name, config, defaults, options)
 
 class CloudCollectorAmazonAWS(CloudCollector):
 
-  def __init__(self, name, config, defaults, options, collector_pkg):
-    super().__init__(name, config, defaults, options, collector_pkg)
+  def __init__(self, name, config, defaults, options):
+    super().__init__(name, config, defaults, options)
 
   def _config_keys():
     return {
@@ -25,6 +25,9 @@ class CloudCollectorAmazonAWS(CloudCollector):
        region: 'AWS Region',
        account_id: 'AWS Account'
     }
+
+  def _get_dependencies(self):
+    return ["ebs"]
 
   def _login(self):
     access_key = self.config['access_key']
@@ -67,7 +70,6 @@ class CloudCollectorAmazonAWS(CloudCollector):
          next_token = instances['NextToken']
       if not next_token:
         break
-
     return data
 
   def _get_instance_type(self, itype):
@@ -86,9 +88,6 @@ class CloudCollectorAmazonAWS(CloudCollector):
       raise Exception("Instance type '{}' not found".format(itype))
 
     return self.instance_types[itype]
-
-  def _get_dep_list(self):
-    return ["ebs"]
 
   def _process_vm(self, rec):
     instance_type = rec["InstanceType"]
@@ -116,13 +115,13 @@ class CloudCollectorAmazonAWS(CloudCollector):
           "connected": True
         })
 
+    # TODO: avoid duplicate counting
     storage = None
     storages = None
-    try:
-      storage = self.res_collectors["ebs"].get_data()[rec["InstanceId"]]["size"]
-      storages = self.res_collectors["ebs"].get_data()[rec["InstanceId"]]["storages"]
-    except Exception:
-      storages = []
+    ebs_data = self.get_resource_data("ebs")
+    if ebs_data and rec["InstanceId"] in ebs_data:
+      storage = ebs_data[rec["InstanceId"]]["size"]
+      storages = ebs_data[rec["InstanceId"]]["storages"]
 
     tags = {}
     for tag in rec.get("Tags", []):
@@ -141,7 +140,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
         "type": instance_type,
         "cpus": rec["CpuOptions"]["CoreCount"] or instance_def["cpu"],
         "memory": instance_def["memory"],
-        "disks": None,	# TODO
+        "disks": len(storages),
         "storage": storage,
         "primary_ip":  rec.get("PrivateIpAddress") or rec.get("PublicIpAddress"),
         "primary_fqdn": rec.get("PrivateDnsName") or rec.get("PublicDnsName"),

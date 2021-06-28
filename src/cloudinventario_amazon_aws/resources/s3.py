@@ -3,13 +3,13 @@ from pprint import pprint
 
 from cloudinventario.helpers import CloudInvetarioResource
 
-def get_resource_obj(collector):
-  return CloudInventarioS3(collector)
+def setup(resource, collector):
+  return CloudInventarioS3(resource, collector)
 
 class CloudInventarioS3(CloudInvetarioResource):
 
-  def __init__(self, collector):
-    super().__init__("s3", collector)
+  def __init__(self, resource, collector):
+    super().__init__(resource, collector)
 
   def _login(self, session):
     self.session = session
@@ -48,4 +48,4 @@ class CloudInventarioS3(CloudInvetarioResource):
       "owner": acl['Owner']['ID']
     }
 
-    return self.collector.new_record(self.res_type, data, data)
+    return self.new_record(self.res_type, data, data)

@@ -18,19 +18,22 @@ class CloudEncoder(json.JSONEncoder):
 class CloudCollector:
   """Cloud collector."""
 
-  def __init__(self, name, config, defaults, options, collector_pkg):
+  def __init__(self, name, config, defaults, options):
     self.name = name
     self.config = config
     self.defaults = defaults
     self.options = options
-    self.collector_pkg = collector_pkg
-    self.dep_list = self._get_dep_list()
+    self.collector_pkg = config['_collector_pkg']
+    self.resources = config['_resources']
+    self.dependencies = self._get_dependencies()
+
+    self.resource_manager = None
+    self.resource_collectors = self.load_resource_collectors(self.resources) or []
+
     self.allow_self_signed = options.get('allow_self_signed', config.get('allow_self_signed', False))
     if self.allow_self_signed:
       requests.packages.urllib3.disable_warnings()
     self.verify_ssl = self.options.get('verify_ssl_certs', config.get('verify_ssl_certs', True))
-    self.resource_manager = None
-    self.res_collectors = self.load_res_collectors(self.config.get("collect"), options["tasks"]) or []  # TODO: check whether "options" implemented as intended
 
   def __pre_request(self):
     pass
@@ -50,7 +53,7 @@ class CloudCollector:
       self.__post_request()
 
   def resource_login(self, session):
-    for resource, res_collector in self.res_collectors.items():
+    for resource, res_collector in self.resource_collectors.items():
       try:
         logging.debug("Passing session to: {}".format(resource))
         res_collector.login(session)
@@ -73,12 +76,11 @@ class CloudCollector:
   def resource_fetch(self):
     data = []
     try:
-      for res in self.resource_manager.dep_classif["dep_only"]:
-        self.res_collectors[res].fetch()
-      for res in self.resource_manager.dep_classif["dep_not_only"]:
-        data.extend(self.res_collectors[res].fetch())
-      for res in self.resource_manager.dep_classif["not_dep"]:
-        data.extend(self.res_collectors[res].fetch())
+      res = ''
+      for res in self.resource_manager.dep_classif["dependency"]:
+        self.resource_collectors[res].fetch()   # TODO: dependencies should go also to data result and collector shourl remove them from list if attached
+      for res in self.resource_manager.dep_classif["not_dependency"]:
+        data.extend(self.resource_collectors[res].fetch())
       return data
     except Exception:
       logging.error("Failed to fetch the following resource collector: {}".format(res))
@@ -96,41 +98,45 @@ class CloudCollector:
 
   def get_resource_data(self, resource):
     try:
-      return self.rd[resource]
+      return self.resource_collectors[resource].data
     except Exception:
       logging.error("Failed to get data of the following resource: {}".format(resource))
       raise
 
   def delete_resource_data(self, resource):
     try:
-      self.rd[resource] = ""
+      self.resource_collectors[resource].data = None
     except Exception:
       logging.error("Failed to delete data of the following resource: {}".format(resource))
       raise
 
   def set_resource_data(self, resource, new_data):
     try:
-      self.rd[resource] = new_data
+      self.resource_collectors[resource].data = new_data
     except Exception:
       logging.error("Failed to set data of the following resource: {}".format(resource))
       raise
 
-  def load_res_collectors(self, res_list, tasks):
+  def load_resource_collectors(self, res_list):
     try:
       self.resource_manager = CloudInvetarioResourceManager(res_list, self.collector_pkg, self)
-      res_collectors = self.resource_manager.get_resource_objs(self.dep_list)
+      res_collectors = self.resource_manager.get_resource_objs(self.dependencies)
       return res_collectors
     except:
       raise
 
-  def get_dep_list(self):
+  def get_dependencies(self):
     try:
       logging.debug("Getting dependencies for the following module: {}".format(self.name))
-      dep_list = self._get_dep_list() or []
+      dep_list = self._get_dependencies() or []
+      dep_list = dep_list + self.config.get('_dependencies', [])
       return dep_list
     except Exception:
       logging.error("Failed to get dependencies for the following collector: {}".format(self.name))
       raise
+
+  def _get_dependencies(self):
+    return None
 
   def new_record(self, rectype, attrs, details):
     attr_keys = ["created",
@@ -185,46 +191,44 @@ class CloudCollector:
     if len(attrs) > 0:
       rec["attributes"] = json.dumps(attrs, default=str)
     rec["details"] = json.dumps(details, cls=CloudEncoder, default=str)
+
     return rec
 
 class CloudInvetarioResourceManager:
 
-  def __init__(self, res_list, COLLECTOR_PKG, collector):
-    self.res_list = res_list
-    self.COLLECTOR_PKG = COLLECTOR_PKG
+  def __init__(self, res_list, collector_pkg, collector):
+    self.res_list = res_list or []
+    self.collector_pkg = collector_pkg
     self.collector = collector
     self.dep_classif = {  # dependency_classification
-      "dep_only": set(),
-      "dep_not_only": set(),
-      "not_dep": set()
+      "dependency": set(),
+      "not_dependency": set(),
     }
-
 
   def get_resource_objs(self, res_dep_list = None):
     obj_list = {}
 
     # sorting based on whether a resource needs priority in fetching or not
-    for resource in set(res_dep_list):
-      if resource in self.res_list:
-        self.dep_classif["dep_not_only"].add(resource)
+    res_list = list(set(res_dep_list + self.res_list))
+    for resource in res_list:
+      if resource in res_dep_list:
+        self.dep_classif["dependency"].add(resource)
       else:
-        self.dep_classif["dep_only"].add(resource)
-    self.dep_classif["not_dep"] = set(self.res_list) - set(res_dep_list)
+        self.dep_classif["not_dependency"].add(resource)
 
     res_list = []
-    res_list.extend(self.dep_classif["dep_only"] or [])
-    res_list.extend(self.dep_classif["dep_not_only"] or [])
-    res_list.extend(self.dep_classif["not_dep"] or [])
+    res_list.extend(self.dep_classif["dependency"] or [])
+    res_list.extend(self.dep_classif["not_dependency"] or [])
 
     for res in res_list:
       try:
-        mod_name = self.COLLECTOR_PKG + ".res_collectors." + res
+        mod_name = self.collector_pkg + ".resources." + res
         logging.debug("Importing module: {}".format(mod_name))
         res_mod = importlib.import_module(mod_name)
       except Exception as e:
         logging.error("Failed to load the following module:{}, reason: {}".format(mod_name, e))
         continue
-      obj_list[res] = res_mod.get_resource_obj(self.collector)
+      obj_list[res] = res_mod.setup(mod_name, self.collector)
 
     return obj_list
 
@@ -277,3 +281,5 @@ class CloudInvetarioResource():
     except Exception:
       logging.error("Failed to get the data of the following of resource: {}".format(self.res_type))
 
+  def new_record(self, rectype, attrs, details):
+    return self.collector.new_record(rectype, attrs, details)

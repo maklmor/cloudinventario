@@ -2,13 +2,13 @@ import boto3
 
 from cloudinventario.helpers import CloudInvetarioResource
 
-def get_resource_obj(collector):
-  return CloudInventarioEbs(collector)
+def setup(resource, collector):
+  return CloudInventarioEbs(resource, collector)
 
 class CloudInventarioEbs(CloudInvetarioResource):
 
-  def __init__(self, collector):
-    super().__init__("ebs", collector)
+  def __init__(self, resource, collector):
+    super().__init__(resource, collector)
 
   def _login(self, session):
     self.session = session

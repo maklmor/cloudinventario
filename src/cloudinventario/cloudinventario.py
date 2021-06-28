@@ -36,8 +36,14 @@ class CloudInventario:
      mod_name = re.sub(r'_', '__', mod_name)
      mod_name = re.sub(r'-', '_', mod_name)
 
-     mod = importlib.import_module(COLLECTOR_PREFIX + '_' + mod_name + '.collector')
-     mod_instance = mod.setup(collector, mod_cfg['config'], mod_cfg.get('default', {}), options or {}, COLLECTOR_PREFIX + '_' + mod_name)
+     mod_pkg = COLLECTOR_PREFIX + '_' + mod_name
+     mod_config = {**mod_cfg['config'], **{
+        '_collector_pkg': mod_pkg,
+        '_resources': mod_cfg.get('collect', []),
+     }}
+
+     mod = importlib.import_module(mod_pkg + '.collector')
+     mod_instance = mod.setup(collector, mod_config, mod_cfg.get('default', {}), options or {})
      return mod_instance
 
    def collect(self, collector, options = None):

@@ -3,13 +3,13 @@ from pprint import pprint
 
 from cloudinventario.helpers import CloudInvetarioResource
 
-def get_resource_obj(collector):
-  return CloudInventarioElb(collector)
+def setup(resource, collector):
+  return CloudInventarioElb(resource, collector)
 
 class CloudInventarioElb(CloudInvetarioResource):
 
-  def __init__(self, collector):
-    super().__init__("elb", collector)
+  def __init__(self, resource, collector):
+    super().__init__(resource, collector)
 
   def _login(self, session):
     self.session = session
@@ -73,4 +73,4 @@ class CloudInventarioElb(CloudInvetarioResource):
       "subnets": balancer['Subnets']
     }
 
-    return self.collector.new_record(self.res_type, data, balancer)
+    return self.new_record(self.res_type, data, balancer)

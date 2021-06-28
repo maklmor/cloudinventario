@@ -21,8 +21,6 @@ def setup(name, config, defaults, options):
 
 class CloudCollectorVMWareVCD(CloudCollector):
 
-  COLLECTOR_PKG = "cloudinventario_vmware_vcd"
-
   def __init__(self, name, config, defaults, options):
     super().__init__(name, config, defaults, options)
 
