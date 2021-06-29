@@ -8,6 +8,8 @@ re_windows = re.compile(".*Windows", re.IGNORECASE)
 OS_WINDOWS = "Windows"
 re_vmware = re.compile(".*VMware", re.IGNORECASE)
 OS_VMWARE = "VMware"
+re_cisco = re.compile(".*Cisco", re.IGNORECASE)
+OS_VMWARE = "Cisco"
 OS_OTHER = "Other"
 
 def get_os_family(str, desc = None):
@@ -21,6 +23,8 @@ def get_os_family(str, desc = None):
     return OS_ROUTEROS
   elif re_vmware.match(str):
     return OS_VMWARE
+  elif re_cisco.match(str):
+    return OS_CISCO
   else:
     return OS_OTHER
 
