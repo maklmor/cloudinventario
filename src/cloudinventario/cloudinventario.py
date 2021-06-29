@@ -20,7 +20,7 @@ class CloudInventario:
           collectors.append(col)
      return collectors
 
-   @ property
+   @property
    def expiredCollectors(self):
      # TODO
      pass
@@ -32,23 +32,25 @@ class CloudInventario:
      mod_cfg = self.collectorConfig(collector)
 
      mod_name = mod_cfg['module']
+     mod_config = mod_cfg['config']
      mod_defaults = mod_cfg.get('default', {})
-     return CloudInventario.loadCollectorModule(mod_name, collector, mod_cfg['config'], mod_defaults, options)
+     return CloudInventario.loadCollectorModule(mod_name, collector, mod_config, mod_defaults, options)
 
    @staticmethod
    def loadCollectorModule(mod_name, collector, config, defaults = None, options = None):
      mod_name = re.sub(r'[/.]', '_', mod_name) # basic safety, should throw error
      mod_name = re.sub(r'_', '__', mod_name)
      mod_name = re.sub(r'-', '_', mod_name)
-
      mod_pkg = COLLECTOR_PREFIX + '_' + mod_name
-     config = {**config, **{
-        '_collector_pkg': mod_pkg,
-        '_resources': config.get('collect', [])
-     }}
 
      mod = importlib.import_module(mod_pkg + '.collector')
      mod_instance = mod.setup(collector, config, defaults, options or {})
+
+     # XXX: init for resource collectors (I don't like it)
+     mod_instance._init(
+        collector_pkg = mod_pkg,
+        resources = config.get('collect', [])
+     )
      return mod_instance
 
    def collect(self, collector, options = None):

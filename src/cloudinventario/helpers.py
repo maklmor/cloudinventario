@@ -23,17 +23,24 @@ class CloudCollector:
     self.config = config
     self.defaults = defaults
     self.options = options
-    self.collector_pkg = config['_collector_pkg']
-    self.resources = config['_resources']
-    self.dependencies = self._get_dependencies()
-
-    self.resource_manager = None
-    self.resource_collectors = self.load_resource_collectors(self.resources) or {}
 
     self.allow_self_signed = options.get('allow_self_signed', config.get('allow_self_signed', False))
     if self.allow_self_signed:
       requests.packages.urllib3.disable_warnings()
     self.verify_ssl = self.options.get('verify_ssl_certs', config.get('verify_ssl_certs', True))
+
+    self.resource_manager = None
+    self.resource_collectors = {}
+
+    return
+
+  def _init(self, **kwargs):
+    self.collector_pkg = kwargs['collector_pkg']
+    self.resources = kwargs['resources']
+    self.dependencies = self._get_dependencies()
+
+    self.resource_collectors = self.load_resource_collectors(self.resources) or {}
+    return True
 
   def __pre_request(self):
     pass
@@ -62,12 +69,13 @@ class CloudCollector:
       except Exception:
         logging.error("Failed to pass session to the following resource: {}".format(resource))
         raise
+    return True
 
   def fetch(self, collect = None):
     self.__pre_request()
     try:
       data = []
-      data.extend(self.resource_fetch())
+      data.extend(self._resource_fetch())
       data.extend(self._fetch(collect))
       return data
     except:
@@ -75,7 +83,10 @@ class CloudCollector:
     finally:
       self.__post_request()
 
-  def resource_fetch(self):
+  def _resource_fetch(self):
+    if not self.resource_manager:
+      return []
+
     data = []
     try:
       res = ''
@@ -99,25 +110,18 @@ class CloudCollector:
       self.__post_request()
 
   def get_resource_data(self, resource):
-    try:
+    if resource in self.resource_collectors:
       return self.resource_collectors[resource].data
-    except Exception:
-      logging.error("Failed to get data of the following resource: {}".format(resource))
-      raise
+    else:
+      return []
 
   def delete_resource_data(self, resource):
-    try:
+    if resource in self.resource_collectors:
       self.resource_collectors[resource].data = None
-    except Exception:
-      logging.error("Failed to delete data of the following resource: {}".format(resource))
-      raise
 
   def set_resource_data(self, resource, new_data):
-    try:
+    if resource in self.resource_collectors:
       self.resource_collectors[resource].data = new_data
-    except Exception:
-      logging.error("Failed to set data of the following resource: {}".format(resource))
-      raise
 
   def load_resource_collectors(self, res_list):
     try:
