@@ -1,6 +1,6 @@
 import re
 
-re_linux = re.compile(".*Linux|Ubuntu|Debian|CentOS|RedHat|Alpine|Gentoo", re.IGNORECASE)
+re_linux = re.compile(".*Linux|Ubuntu|Debian|CentOS|RedHat|Alpine|Gentoo|ROCK", re.IGNORECASE)
 OS_LINUX = "Linux"
 re_routeros = re.compile(".*RouterOS", re.IGNORECASE)
 OS_ROUTEROS = "RouterOS"
@@ -9,7 +9,7 @@ OS_WINDOWS = "Windows"
 re_vmware = re.compile(".*VMware", re.IGNORECASE)
 OS_VMWARE = "VMware"
 re_cisco = re.compile(".*Cisco", re.IGNORECASE)
-OS_VMWARE = "Cisco"
+OS_CISCO = "Cisco"
 OS_OTHER = "Other"
 
 def get_os_family(str, desc = None):

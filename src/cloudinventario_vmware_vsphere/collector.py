@@ -21,6 +21,8 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     self.client = None
     self.maxDepth = 10
     self.vm2cluster = {}
+    self.vm2dvsPort = {}
+    self.vm2dvsPortKey = {}
 
   def _login(self):
     host = self.config['host']
@@ -55,14 +57,51 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     # collect networks (DistributedVirtualPortgroup)
     logging.info("collecting networks")
     self.networks = {}
+    dvs_portgroup = None
     for child in self.content.rootFolder.childEntity:
       if hasattr(child, 'network'):
         for net in child.network:
           if isinstance(net, vim.DistributedVirtualPortgroup):
-            logging.debug("new network name={}".format(net.name))
+            logging.debug("new network key={} name={}".format(net.key, net.name))
             self.networks[net.key] = net.name
+            dvp_net = net
+          elif isinstance(net, vim.Network):
+            logging.debug("new network name={}".format(net.name))
+            self.networks[net.name] = net.name
           else:
-            logging.error("bad network name={}".format(net.name))	# TODO: handle this !
+            logging.error("bad network name={} type={}".format(net.name, net))	# TODO: handle this !
+
+    # fetch ports
+    try:
+      ports = net.config.distributedVirtualSwitch.FetchDVPorts()
+      for port in ports:
+        if port.connectee and port.connectee.connectedEntity:
+           vmid = port.connectee.connectedEntity._moId
+           state = port.state.runtimeInfo
+
+           if not vmid in self.vm2dvsPort:
+             self.vm2dvsPort[vmid] = []
+             self.vm2dvsPortKey[vmid] = []
+           if port.key not in self.vm2dvsPortKey[vmid]:
+             self.vm2dvsPortKey[vmid].append(port.key)
+             self.vm2dvsPort[vmid].append({
+               "portKey": port.key,
+               "nicKey": port.connectee.nicKey,
+               "connected": state.linkUp,
+               "vlan": state.vlanIds[0].start,
+               #"vlanRange": [ state.vlanIds.start, state.vlanIds.end ],
+               "mac": state.macAddress,
+               "idx": int(state.linkPeer.split('.eth', 1)[1]),
+               "ethName": state.linkPeer.split('.').pop(),
+               "portgroup": port.portgroupKey,
+               "network": self.networks[port.portgroupKey],
+               "dvsUUID": port.dvsUuid,
+      })
+      # sort by idx
+      for vmid in self.vm2dvsPort:
+         self.vm2dvsPort[vmid] = sorted(self.vm2dvsPort[vmid], key = lambda kv: kv.get('idx', 0))
+    except:
+      pass
 
     # collect hosts
     logging.info("collecting clusters")
@@ -365,27 +404,71 @@ class CloudCollectorVMWareVSphere(CloudCollector):
 
     # networks
     networks = []
-    for nic in vm.guest.net:
+    #pprint(vm.config.hardware.device)
+    #pprint(vm.guest.net)
+    for nic_idx in range(len(vm.guest.net)):
+      nic = vm.guest.net[nic_idx]
       net = {
         "id": nic.deviceConfigId,
         "mac": nic.macAddress,
         "network": nic.network,
         "ip": None,
         "connected": nic.connected
-         }
+      }
+
       for ip in nic.ipConfig.ipAddress:
         if not net["ip"] and ip.prefixLength <= 32:	# DUMMY distinguish IPv4 address
           net["ip"] = ip.ipAddress
-          net["prefix"] = ip.prefixLength
+          if ip.prefixLength != 0:
+            net["prefix"] = ip.prefixLength
           if not rec["primary_ip"]:
             rec["primary_ip"] = net["ip"]
         else:
           if not net.get("aliases"):
             net["aliases"] = []
-          net["aliases"].append(ip.ipAddress + "/" + str(ip.prefixLength))
+          net["aliases"].append(ip.ipAddress + "/" + str(ip.prefixLength or 32))
       if net["ip"] and net["ip"] == rec["primary_ip"]:
         net["primary"] = True
-      networks.append(net)
+
+      # XXX: Cisco fix
+      #   vmguest is not reporting correct data, we have to map config
+      #   to reported IPs (this is big heuristics)
+      if len(vm.guest.net) == 1 and \
+          net['id'] <= 0 and net['network'] is None and \
+          net['mac'] == '00:11:22:33:44:55' and \
+          net['ip'] and (len(self.vm2dvsPort[rec['id']]) == 1 + len(net.get('aliases', []))):
+        ports = self.vm2dvsPort[rec['id']]
+        portIP = [ net['ip'] ]
+        portIP.extend(net.get('aliases', []))
+
+        net.pop('aliases', None)
+        for idx in range(len(ports)):
+          port = ports[idx]
+          net["id"] = port["nicKey"]
+          net["mac"] = port["mac"]
+          net["network"] = port["network"]
+          net["ip"] = portIP[idx].split('/', 1)[0]
+          net["connected"] = port["connected"]
+          net["__fix"] = 'ip2port-multi'
+          networks.append(net)
+          net = {}
+      elif net['id'] <= 0 and net['network'] is None and net['ip']:
+        ports = self.vm2dvsPort[rec['id']]
+        fixed = False
+        for port in ports:
+           if port['mac'] == net['mac']:
+             net["id"] = port["nicKey"]
+             net["network"] = port["network"]
+             net["__fix"] = "mac2port"
+             fixed = True
+             break
+        if not fixed:
+          net["id"] = 'CI-NIC' + str(nic_idx)
+          net["name"] = 'nic' + str(nic_idx)
+          net["__fix"] = "autoname"
+        networks.append(net)
+      elif net['ip']:
+        networks.append(net)
     if len(networks) > 0:
       rec["networks"] = networks
 
