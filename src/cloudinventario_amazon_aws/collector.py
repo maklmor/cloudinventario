@@ -135,10 +135,10 @@ class CloudCollectorAmazonAWS(CloudCollector):
     storage = 0
     storages = []
     for volume in ebs:
-      if rec["InstanceId"] in volume["mounts"]:
-        storage += volume["capacity"]
+      # XXX: only count storage size on one instance
+      if volume["mounts"] and rec["InstanceId"] == volume["mounts"][0]:
+        storage += volume["storage"]
         storages.append(volume)
-
 
     vm_data = {
         "created": None,

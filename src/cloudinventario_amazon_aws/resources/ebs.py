@@ -38,15 +38,17 @@ class CloudInventarioEbs(CloudInvetarioResource):
 
   def _process_resource(self, volume):
     mounts = []
-    
+
     for mnt in volume['Attachments']:
       mounts.append(mnt['InstanceId'])
 
     data = {
     "id": volume['VolumeId'],
     "cluster": volume['AvailabilityZone'],
-    "capacity": volume['Size'] * 1024,  # in MB
+    "storage": volume['Size'] * 1024,  # in MB
     "type": volume['VolumeType'],
+    "status": volume['State'],
+    "is_on": (volume['State'] == 'in-use'),
     "encrypted": volume['Encrypted'],
     "mounts": mounts,
     "details": volume
