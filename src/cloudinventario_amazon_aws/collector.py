@@ -130,6 +130,16 @@ class CloudCollectorAmazonAWS(CloudCollector):
     name = tags.get("Name") or rec["InstanceId"]
     logging.debug("new VM name={}".format(name))
 
+    ebs = self.resource_collectors["ebs"].get_raw_data()
+
+    storage = 0
+    storages = []
+    for volume in ebs:
+      if rec["InstanceId"] in volume["mounts"]:
+        storage += volume["capacity"]
+        storages.append(volume)
+
+
     vm_data = {
         "created": None,
         "name": name,
@@ -140,7 +150,7 @@ class CloudCollectorAmazonAWS(CloudCollector):
         "type": instance_type,
         "cpus": rec["CpuOptions"]["CoreCount"] or instance_def["cpu"],
         "memory": instance_def["memory"],
-        "disks": len(storages),
+        "disks": len(ebs),
         "storage": storage,
         "primary_ip":  rec.get("PrivateIpAddress") or rec.get("PublicIpAddress"),
         "primary_fqdn": rec.get("PrivateDnsName") or rec.get("PublicDnsName"),

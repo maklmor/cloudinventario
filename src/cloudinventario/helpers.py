@@ -90,10 +90,8 @@ class CloudCollector:
     data = []
     try:
       res = ''
-      for res in self.resource_manager.dep_classif["dependency"]:
-        self.resource_collectors[res].fetch()   # TODO: dependencies should go also to data result and collector shourl remove them from list if attached
-      for res in self.resource_manager.dep_classif["not_dependency"]:
-        data.extend(self.resource_collectors[res].fetch())
+      for res in self.resource_collectors.values(): # self.resource_collectors is already ordered by dependecy
+        data.extend(res.fetch())
       return data
     except Exception:
       logging.error("Failed to fetch the following resource collector: {}".format(res))
@@ -212,7 +210,7 @@ class CloudInvetarioResourceManager:
     }
 
   def get_resource_objs(self, res_dep_list = []):
-    obj_list = {}
+    obj_dict = {}
 
     # sorting based on whether a resource needs priority in fetching or not
     res_list = list(set((res_dep_list or []) + self.res_list))
@@ -234,9 +232,9 @@ class CloudInvetarioResourceManager:
       except Exception as e:
         logging.error("Failed to load the following module:{}, reason: {}".format(mod_name, e))
         continue
-      obj_list[res] = res_mod.setup(mod_name, self.collector)
+      obj_dict[res] = res_mod.setup(res, self.collector)
 
-    return obj_list
+    return obj_dict
 
 class CloudInvetarioResource():
 
@@ -246,6 +244,7 @@ class CloudInvetarioResource():
     self.session = None
     self.client = None
     self.data = None
+    self.raw_data = []
 
   def login(self, session):
     try:
@@ -256,6 +255,7 @@ class CloudInvetarioResource():
   def fetch(self):
     try:
       logging.debug("Fetching the following type of resource: {}".format(self.res_type))
+      self.raw_data = []
       self.data = self._fetch()
       return self.data
     except Exception:
@@ -287,5 +287,14 @@ class CloudInvetarioResource():
     except Exception:
       logging.error("Failed to get the data of the following of resource: {}".format(self.res_type))
 
+  def get_raw_data(self):
+    try:
+      if self.raw_data is None:
+        self.data = self.fetch()
+      return self.raw_data
+    except Exception:
+      logging.error("Failed to get the raw data of the following of resource: {}".format(self.res_type))
+
   def new_record(self, rectype, attrs, details):
+    self.raw_data.append(attrs)
     return self.collector.new_record(rectype, attrs, details)
