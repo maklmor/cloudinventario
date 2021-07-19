@@ -1,4 +1,4 @@
-import sys, logging
+import sys, logging, re
 from pprint import pprint
 
 import ssl
@@ -75,33 +75,43 @@ class CloudCollectorVMWareVSphere(CloudCollector):
     try:
       ports = net.config.distributedVirtualSwitch.FetchDVPorts()
       for port in ports:
-        if port.connectee and port.connectee.connectedEntity:
+        if port.connectee and port.connectee.connectedEntity and port.state:
            vmid = port.connectee.connectedEntity._moId
            state = port.state.runtimeInfo
 
            if not vmid in self.vm2dvsPort:
              self.vm2dvsPort[vmid] = []
              self.vm2dvsPortKey[vmid] = []
-           if port.key not in self.vm2dvsPortKey[vmid]:
-             self.vm2dvsPortKey[vmid].append(port.key)
-             self.vm2dvsPort[vmid].append({
-               "portKey": port.key,
-               "nicKey": port.connectee.nicKey,
-               "connected": state.linkUp,
-               "vlan": state.vlanIds[0].start,
-               #"vlanRange": [ state.vlanIds.start, state.vlanIds.end ],
-               "mac": state.macAddress,
-               "idx": int(state.linkPeer.split('.eth', 1)[1]),
-               "ethName": state.linkPeer.split('.').pop(),
-               "portgroup": port.portgroupKey,
-               "network": self.networks[port.portgroupKey],
-               "dvsUUID": port.dvsUuid,
-      })
+           try:
+             if port.key not in self.vm2dvsPortKey[vmid]:
+               self.vm2dvsPortKey[vmid].append(port.key)
+               rec = {
+                 "portKey": port.key,
+                 "nicKey": port.connectee.nicKey,
+                 "connected": state.linkUp,
+                 "vlan": state.vlanIds[0].start,
+                 #"vlanRange": [ state.vlanIds.start, state.vlanIds.end ],
+                 "mac": state.macAddress,
+                 "portgroup": port.portgroupKey,
+                 "network": self.networks[port.portgroupKey],
+                 "dvsUUID": port.dvsUuid,
+               }
+               try:
+                 rec["idx"] = int(re.split('\.(eth|vmnic)', state.linkPeer, 1)[1])
+                 rec["ethName"] = state.linkPeer.split('.').pop()
+               except:
+                 pass
+
+               self.vm2dvsPort[vmid].append(rec)
+           except:
+             pass
+
       # sort by idx
       for vmid in self.vm2dvsPort:
-         self.vm2dvsPort[vmid] = sorted(self.vm2dvsPort[vmid], key = lambda kv: kv.get('idx', 0))
+        self.vm2dvsPort[vmid] = sorted(self.vm2dvsPort[vmid], key = lambda kv: kv.get('idx', 0))
     except:
       pass
+    #pprint(self.vm2dvsPort)
 
     # collect hosts
     logging.info("collecting clusters")
@@ -452,7 +462,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
           net["__fix"] = 'ip2port-multi'
           networks.append(net)
           net = {}
-      elif net['id'] <= 0 and net['network'] is None and net['ip']:
+      elif net['id'] <= 0 and net['network'] is None and net['ip'] and rec['id'] in self.vm2dvsPort:
         ports = self.vm2dvsPort[rec['id']]
         fixed = False
         for port in ports:
