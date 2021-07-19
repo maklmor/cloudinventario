@@ -7,6 +7,10 @@ import sqlalchemy as sa
 
 TABLE_PREFIX = "ci_"
 
+STATUS_OK = "OK"
+STATUS_FAIL = "FAIL"
+STATUS_ERROR = "ERROR"
+
 class InventoryStorage:
 
    def __init__(self, config):
@@ -39,10 +43,13 @@ class InventoryStorage:
      meta = sa.MetaData()
      self.source_table = sa.Table(TABLE_PREFIX + 'source', meta,
        sa.Column('id', sa.Integer, primary_key=True, autoincrement=True),
-       sa.Column('source', sa.String),
        sa.Column('ts', sa.String, default=sa.func.now()),
+       sa.Column('source', sa.String),
        sa.Column('version', sa.Integer, default=1),
+       sa.Column('runtime', sa.Integer),
        sa.Column('entries', sa.Integer),
+       sa.Column('status', sa.String),
+       sa.Column('error', sa.Text),
 
        sa.UniqueConstraint('source', 'version')
      )
@@ -92,12 +99,12 @@ class InventoryStorage:
    def __prepare(self):
      pass
 
-   def __get_source_version_max(self):
+   def __get_sources_version_max(self):
      # get active version
      res = self.conn.execute(sa.select([
                    self.source_table.c.source,
                    sa.func.max(self.source_table.c.version).label("version")])
-     	        .group_by(self.source_table.c.source))
+     	              .group_by(self.source_table.c.source))
      res = res.fetchall()
      if res and res[0]["version"]:
        sources = [dict(row) for row in res]
@@ -105,11 +112,33 @@ class InventoryStorage:
        sources = []
      return sources
 
-   def save(self, data):
+   def __get_source_version_max(self, name):
+     sources = self.__get_sources_version_max()
+     for source in sources:
+       if name == source["source"]:
+         return source["version"]
+     return 0
+
+   def log_status(self, source, status, runtime = None, error = None):
+     version = self.__get_source_version_max(source)
+
+     data = {
+       "source": source,
+       "version": version + 1,
+       "status": status,
+       "runtime": runtime,
+       "error": error
+     }
+
+     with self.engine.begin() as conn:
+       conn.execute(self.source_table.insert(), data)
+     return True
+
+   def save(self, data, runtime = None):
      if data is None:
        return False
 
-     sources = self.__get_source_version_max()
+     sources = self.__get_sources_version_max()
 
      # increment versions
      versions = {}
@@ -134,6 +163,8 @@ class InventoryStorage:
        if not source["source"] in entries:
          continue
        source["entries"] = entries[source["source"]]
+       source["status"] = STATUS_OK
+       source["runtime"] = runtime
        sources_save.append(source)
 
      if len(sources) == 0:

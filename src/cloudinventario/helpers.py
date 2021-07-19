@@ -254,7 +254,7 @@ class CloudInvetarioResource():
 
   def fetch(self):
     try:
-      logging.debug("Fetching the following type of resource: {}".format(self.res_type))
+      logging.debug("fetching resource={}".format(self.res_type))
       self.raw_data = []
       self.data = self._fetch()
       return self.data
@@ -264,7 +264,7 @@ class CloudInvetarioResource():
 
   def process_resource(self, resource_data):
     try:
-      logging.debug("Processing the following type of resource: {}".format(self.res_type))
+      #logging.debug("processing resource={}".format(self.res_type))
       data = self._process_resource(resource_data)
       return data
     except Exception:

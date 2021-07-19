@@ -71,16 +71,26 @@ class CloudInventario:
        os.chdir(wd)
      return inventory
 
-   def store(self, inventory):
+   def store(self, inventory, runtime = None):
      store_config = self.config["storage"]
 
      with self.lock:
        store = InventoryStorage(store_config)
 
        store.connect()
-       store.save(inventory)
+       store.save(inventory, runtime)
        store.disconnect()
 
+     return True
+
+   def store_status(self, source, status, runtime = None, error = None):
+     store_config = self.config["storage"]
+
+     with self.lock:
+       store = InventoryStorage(store_config)
+       store.connect()
+       store.log_status(source, status, runtime, error)
+       store.disconnect()
      return True
 
    def cleanup(self, days):
