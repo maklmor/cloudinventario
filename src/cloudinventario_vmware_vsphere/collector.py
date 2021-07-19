@@ -1,3 +1,4 @@
+import concurrent.futures
 import sys, logging, re
 from pprint import pprint
 
@@ -135,10 +136,16 @@ class CloudCollectorVMWareVSphere(CloudCollector):
       if hasattr(child, 'vmFolder'):
         datacenter = child
         vmFolder = datacenter.vmFolder
-        for vm in vmFolder.childEntity:
-          recs = self.__process_vmchild(vm)
-          if recs:
-            res.extend(recs)
+        with concurrent.futures.ThreadPoolExecutor(max_workers = self.options["tasks"] or 1) as executor:
+          futures = []
+          for vm in vmFolder.childEntity:
+            futures.append(executor.submit(self.__process_vmchild, vm))
+
+          for future in concurrent.futures.as_completed(futures):
+            recs = future.result()
+            if recs:
+              res.extend(recs)
+
     return res
 
   def __process_cluster(self, cluster):
