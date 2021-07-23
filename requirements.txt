@@ -7,3 +7,6 @@ pyvcloud
 pyvmomi
 hcloud
 boto3
+google-api-python-client
+google-auth
+google-cloud-datastore

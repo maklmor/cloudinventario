@@ -1,0 +1,1 @@
+"""Google gcp collector."""
