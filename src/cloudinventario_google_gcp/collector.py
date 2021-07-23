@@ -46,12 +46,12 @@ class CloudCollectorGoogleGCP(CloudCollector):
             'client_email': self.config['client_email'],
             'private_key': self.config['private_key'],
 
-            # 'type': self.config['type'],
-            # 'private_key_id': self.config['private_key_id'],
-            # 'client_id': self.config['client_id'],
-            # 'auth_uri': self.config['auth_uri'],
-            # 'auth_provider_x509_cert_url': self.config['auth_provider_x509_cert_url'],
-            # 'client_x509_cert_url': self.config['client_x509_cert_url']
+            'type': self.config['type'],
+            'private_key_id': self.config['private_key_id'],
+            'client_id': self.config['client_id'],
+            'auth_uri': self.config['auth_uri'],
+            'auth_provider_x509_cert_url': self.config['auth_provider_x509_cert_url'],
+            'client_x509_cert_url': self.config['client_x509_cert_url']
         }
 
         self.zone = self.config['zone']
@@ -66,47 +66,39 @@ class CloudCollectorGoogleGCP(CloudCollector):
     def _fetch(self, collect):
         data = []
         
-        # GET all instance with specific project name and zone (return json, where data are in items)
+        # GET all instances with specific project name and zone (return JSON, where data are in items)
         _instance = self.compute_engine.instances()
         instances = _instance.list(project=self.project_name, zone=self.zone).execute()
-        _instance.close()
 
         for instance in instances['items']:
             if 'name' in instance:
                 # GET resources
                 resource = _instance.listReferrers(project=self.project_name, zone=self.zone, instance=instance['name']).execute()
-                instance['resource'] = resource # Append resources into instance
+                instance['resource'] = resource # Append resources into instance 'resource'
 
                 # GET machine type
-                machine_type_name = re.sub(r".*/machineTypes/", '', instance['machineType']) #'e2-micro'
+                machine_type_name = re.sub(r".*/machineTypes/", '', instance['machineType'])
                 _machine_type = self.compute_engine.machineTypes()
                 machine_type = _machine_type.get(project=self.project_name, zone=self.zone, machineType=machine_type_name).execute()
                 _machine_type.close()
-                instance['machineTypeInfo'] = machine_type # Append machine into instance
-
-                # GET subnetworks
-                # region_name = re.sub('-[a|b|c]{1}$', '', self.zone)
-                # _subnetworks = self.compute_engine.subnetworks()
-                # subnetworks = _subnetworks.list(project=self.project_name, region=region_name).execute()
-                # _subnetworks.close()
-                # instance['subnetworks'] = subnetworks # Append subnetworks into instance
+                instance['machineTypeInfo'] = machine_type # Append machine into instance 'machineTypeInfo'
 
                 # GET disks
                 _disks = self.compute_engine.disks()
                 disks = _disks.list(project=self.project_name, zone=self.zone).execute()
                 _disks.close()
-                instance['disksInfo'] = disks.get('items') # Append disks into instance
+                instance['disksInfo'] = disks.get('items') # Append disks into instance 'disksInfo'
 
                 # Process instance
                 data.append(self._process_vm(instance))
+        _instance.close()
 
         logging.info("Collect {} data".format(len(data)))
         return data
 
     def _process_vm(self, rec):
         networks = []
-        public_ip = rec['networkInterfaces'][0]['accessConfigs'][0].get('natIP') # rec['networkInterfaces'][0].get('accessConfigs')[0].get('natIP') if len(rec['networkInterfaces']) > 0 and 'accessConfigs' in rec['networkInterfaces'][0] and len(rec['networkInterfaces'][0].get('accessConfig')) > 0 else None
-
+        public_ip = rec['networkInterfaces'][0]['accessConfigs'][0].get('natIP') 
         for iface in rec['networkInterfaces']:
             networks.append({
                 'name': iface['name'],
@@ -121,26 +113,9 @@ class CloudCollectorGoogleGCP(CloudCollector):
 
         storages = []
         disks_size = 0
-        ## Disks Version from request DISK().list() (show all)
-        # for disk in rec['disksInfo']:
-        #     kind = 'notAttachedDisk'
-        #     for attached_disk in rec['disks']:
-        #         if attached_disk['deviceName'] == disk['name']:
-        #             if attached_disk['kind'] == 'compute#attachedDisk':
-        #                 kind = 'attachedDisk'
-        #             break
-        #     disks_size += (int(disk['sizeGb']) * 1000)
-        #     storages.append({
-        #         'size': (int(disk['sizeGb']) * 1000),
-        #         'name': disk['name'],
-        #         'type': re.sub(r'.*/diskTypes/', '', disk['type']),
-        #         'created': disk['creationTimestamp'],
-        #         'blockSize': disk['physicalBlockSizeBytes'],
-        #         'status': disk['status'],
-        #         'kind': kind
-        #     })
         
-        ## Disks Version from request instances.list() (show only attached)
+        ## Disks version from request instances.list() 
+        ## show only attached, but add type, created, blockSize, status from disks.list() request
         for disk in rec['disks']:
             type = ''
             created = ''
@@ -181,7 +156,7 @@ class CloudCollectorGoogleGCP(CloudCollector):
             "primary_ip":  rec["networkInterfaces"][0].get("networkIP") if len(rec["networkInterfaces"]) > 0 else None, 
             "primary_fqdn": None, # Not found
             "public_ip": public_ip,
-            "public_fqdn": None,  
+            "public_fqdn": None, # Not found
             "networks": networks,
             "storages": storages,  # Field rec["disks"]
             "monitoring": rec["shieldedInstanceConfig"].get("enableIntegrityMonitoring"),
@@ -191,7 +166,6 @@ class CloudCollectorGoogleGCP(CloudCollector):
             "is_on": (1 if rec["status"] == "RUNNING" else 0),
             "tags": rec["tags"]
         }
-
         return self.new_record('vm', vm_data, rec)
 
     def _logout(self):
