@@ -46,12 +46,12 @@ class CloudCollectorGoogleGCP(CloudCollector):
             'client_email': self.config['client_email'],
             'private_key': self.config['private_key'],
 
-            'type': self.config['type'],
-            'private_key_id': self.config['private_key_id'],
-            'client_id': self.config['client_id'],
-            'auth_uri': self.config['auth_uri'],
-            'auth_provider_x509_cert_url': self.config['auth_provider_x509_cert_url'],
-            'client_x509_cert_url': self.config['client_x509_cert_url']
+            'type': self.config['type'] if 'type' in self.config else None,
+            'private_key_id': self.config['private_key_id'] if 'private_key_id' in self.config else None,
+            'client_id': self.config['client_id'] if 'client_id' in self.config else None,
+            'auth_uri': self.config['auth_uri'] if 'auth_uri' in self.config else None,
+            'auth_provider_x509_cert_url': self.config['auth_provider_x509_cert_url'] if 'auth_provider_x509_cert_url' in self.config else None,
+            'client_x509_cert_url': self.config['client_x509_cert_url'] if 'client_x509_cert_url' in self.config else None
         }
 
         self.zone = self.config['zone']
