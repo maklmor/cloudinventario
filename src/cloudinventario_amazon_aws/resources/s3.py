@@ -35,6 +35,7 @@ class CloudInventarioS3(CloudInvetarioResource):
       acl = self.client.get_bucket_acl(Bucket=bucket_name)
       acl.pop("ResponseMetadata", None)
       details["acl"] = acl
+      acl = acl['Grants']
     except Exception:
       acl = None
       logging.info("The acl of the following bucket was not found: {}, you need the \"READ_ACP\" permission".format(bucket_name))
@@ -42,7 +43,8 @@ class CloudInventarioS3(CloudInvetarioResource):
     try: # location
       location = self.client.get_bucket_location(Bucket=bucket_name)
       location.pop("ResponseMetadata", None)
-      details["location"] = location
+      details["location"] = location['LocationConstraint']
+      location = location
     except Exception:
       location = None
       logging.info("The acl of the following bucket was not found: {}, you must be owner".format(bucket_name))
@@ -56,7 +58,7 @@ class CloudInventarioS3(CloudInvetarioResource):
       logging.info("The ownership controls of the following bucket were not found: {}, you need the \"S3:GetBucketOwnershipControls\" permission".format(bucket_name))
 
     try: # policy status
-      policy_status = self.client.get_bucket_policy_status(Bucket=bucket_name)['PolicyStatus']["IsPublic"]
+      policy_status = self.client.get_bucket_policy_status(Bucket=bucket_name)['PolicyStatus']
       policy_status.pop("ResponseMetadata", None)
       details["policy_status"] = policy_status
     except Exception:
@@ -75,13 +77,14 @@ class CloudInventarioS3(CloudInvetarioResource):
       versioning = self.client.get_bucket_versioning(Bucket=bucket_name)
       versioning.pop("ResponseMetadata", None)
       details["versioning"] = versioning
+      versioning = versioning['Status']
     except Exception:
       versioning = None
       logging.info("The acl of the following bucket was not found: {}, you must be owner".format(bucket_name))
 
     data = {
-      "acl": acl['Grants'],
-      "location": location['LocationConstraint'],
+      "acl": acl,
+      "location": location,
       "ownership_controls": ownership_controls,
       "policy_status": policy_status,
       "versioning": versioning,
