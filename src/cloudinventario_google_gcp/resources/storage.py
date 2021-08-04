@@ -24,7 +24,7 @@ class CloudInventarioStorage(CloudInvetarioResource):
 
         self.project_name = self.collector.config['project_id']
         self.client_email = self.collector.config['client_email']
-        logging.info("logging config for GCP storage client_email={}, project_name={}".format(self.config['client_email'], self.project_name))
+        logging.info("logging config for GCP storage client_email={}, project_name={}".format(self.client_email , self.project_name))
 
     def _fetch(self):
         data = []
