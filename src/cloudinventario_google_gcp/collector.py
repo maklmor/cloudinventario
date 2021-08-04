@@ -129,9 +129,9 @@ class CloudCollectorGoogleGCP(CloudCollector):
                     status = diskInfo['status']
                     break
 
-            disks_size += (int(disk['diskSizeGb']) * 1000)
+            disks_size += (int(disk['diskSizeGb']) * 1024)
             storages.append({
-                'size': (int(disk['diskSizeGb']) * 1000),
+                'size': (int(disk['diskSizeGb']) * 1024),
                 'name': disk['deviceName'],
                 'kind': disk['kind'],
                 'type': type,
