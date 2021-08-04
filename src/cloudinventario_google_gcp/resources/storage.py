@@ -28,7 +28,7 @@ class CloudInventarioStorage(CloudInvetarioResource):
 
     def _fetch(self):
         data = []
-        # GET storage 
+        # GET storages
         self.storage = googleapiclient.discovery.build('storage', 'v1', credentials=self.credentials)
 
         # GET all buckets in specific project
