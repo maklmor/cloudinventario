@@ -58,7 +58,7 @@ class CloudInventarioStorage(CloudInvetarioResource):
 
             data.append(self._process_resource(bucket))
 
-        logging.info("Collected {} resources".format(len(data)))
+        logging.info("Collected {} storages".format(len(data)))
         self.storage.close()
         return data
 

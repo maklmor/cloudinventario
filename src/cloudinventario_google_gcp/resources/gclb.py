@@ -48,7 +48,8 @@ class CloudInventarioGclb(CloudInvetarioResource):
         balancer['globalAddress'] = globalAddress
 
         data.append(self._process_resource(balancer))
-      
+    
+    logging.info("Collected {} gclb".format(len(data)))
     _compute_engine.close()
     return data
 
