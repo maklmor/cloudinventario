@@ -63,7 +63,7 @@ class CloudInventarioStorage(CloudInvetarioResource):
         return data
 
     def _process_resource(self, bucket):
-        logging.info("new storage bucket name={}".format(bucket.get('name')))
+        logging.info("new storage name={}".format(bucket.get('name')))
         data = {
             "acl": bucket['acl'] if 'acl' in bucket else None,
             "location": bucket['location'],

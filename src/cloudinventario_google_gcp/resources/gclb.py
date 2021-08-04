@@ -1,5 +1,6 @@
 from pprint import pprint
 import logging
+import re
 
 from google.oauth2 import service_account
 import googleapiclient.discovery
@@ -46,13 +47,45 @@ class CloudInventarioGclb(CloudInvetarioResource):
       for balancer in backend_services['items']:
         balancer['healthChecks'] = healthChecks
         balancer['globalAddress'] = globalAddress
+        # GET instanceGroup and list of managed instances
+        balancer['instanceGroups'] = self._process_instances_group(_compute_engine, balancer)
 
         data.append(self._process_resource(balancer))
     
     logging.info("Collected {} gclb".format(len(data)))
     _compute_engine.close()
     return data
+  
+  def _process_instances_group(self, _compute_engine, balancer):
+    _instanceGroups = _compute_engine.instanceGroups()
+    result = []
+    for backend in balancer['backends']:
+      # Get zone name from group in backends
+      zone = re.findall(r'zones/(.*?)/', backend.get('group'))[0]
+      # Get instanceGroup name from group in backends
+      instanceGroup = re.findall(r'instanceGroups/(.*)', backend.get('group'))[0]
 
+      # Get listInstances
+      listInstances = _instanceGroups.listInstances(project=self.project_name, zone=zone, instanceGroup=instanceGroup).execute()
+      instances = []
+      if 'items' in listInstances:
+        for instance in listInstances['items']:
+          instances.append({
+            'instance': re.findall(r'instances/(.*)', instance.get('instance'))[0],
+            'status': instance.get('status')
+          })
+
+      # Create result object of backend
+      result.append({
+        'balancingMode': backend.get('balancingMode'),
+        'instanceGroup': instanceGroup,
+        'zone': zone,
+        'mapInstances': instances
+      })
+
+    _instanceGroups.close()
+    return result
+    
   def _process_health_check(self, _healthChecks):
     healthChecks = _healthChecks.list(project=self.project_name).execute()
     result = []
@@ -108,12 +141,6 @@ class CloudInventarioGclb(CloudInvetarioResource):
     return result
 
   def _process_resource(self, balancer):
-    # Collect all balancingMode from backend attribute (array)
-    balancingModes = []
-    if 'backends' in balancer:
-      for mode in balancer['backends']:
-        balancingModes.append(mode.get('balancingMode'))
-
     # Collect healthCheck status from responses 
     healthCheckStatus = []
     if len(balancer['healthChecks']) > 0:
@@ -123,17 +150,16 @@ class CloudInventarioGclb(CloudInvetarioResource):
             'status': healthCheck['status']
             })
 
-    logging.info("new google cloud load balancing name={}".format(balancer.get('name')))
+    logging.info("new gclb name={}".format(balancer.get('name')))
     data = {
       "id": balancer['id'],
       "created": balancer['creationTimestamp'],
       "name": balancer['name'],
       "instances": balancer['healthChecks'],
-      "cluster": balancer.get('region'),
       "subnets": balancer['globalAddress'], # Not sure
       "scheme": balancer['loadBalancingScheme'],
       "status": healthCheckStatus,
-      "balancingMode": balancingModes,
+      "backends": balancer['instanceGroups'],
       "project": self.project_name,
       "description": balancer['description']
       # "is_on": True if status == "on" else False, # Not know 
