@@ -1,8 +1,11 @@
+
 import concurrent.futures
 import logging, re, sys, asyncio, time
 from pprint import pprint
+from boto3 import resources
 
 from hcloud import Client
+from httplib2 import Response
 
 from cloudinventario.helpers import CloudCollector
 
@@ -29,7 +32,7 @@ class CloudCollectorHetznerHCloud(CloudCollector):
     res = []
     servers = self.client.servers.get_all()
     for server in servers:
-      res.append(self.__to_dict(server))
+      res.append(self._process_vm(server))
       time.sleep(1/4)
     return res
 
@@ -49,6 +52,55 @@ class CloudCollectorHetznerHCloud(CloudCollector):
     else:
        return obj
     return result
+    
+  def _process_vm(self, server):
 
-  def _logout(self):
-    self.client = None
+    data = self.__to_dict(server)
+
+    networks = []
+#    if data["public_net"]:
+#       networks.append({
+#         "name": "public",
+#         "ip": data["public_net"]["ipv4"]["ip"].
+#       })
+#    for iface in data["private_net"]:
+#       ....
+
+    #instance_type = data["InstanceType"]
+    #instance_def = self._get_instance_type(instance_type)
+    memory_size = data["server_type"]["memory"]*1024
+    memory_size = int(memory_size)
+    storage_size = data["server_type"]["disk"]*1024
+    storage_size = int(storage_size)
+
+    pprint(data)
+    vm_data = {
+            "id": data["id"],
+            "name": data["name"],
+            "primary_ip": data["public_net"]["ipv4"]["ip"],
+            #"mac_address": None["private_net"]["mac_address"],
+            "status": data["status"],
+            "is_on": (data["status"] == "running"),
+            "cpus": data["server_type"]["cores"],
+            "cputype": data["server_type"]["cpu_type"],
+            "memory": memory_size,
+            "networks": networks,
+            "storage": storage_size,
+            "storage_type": data["server_type"]["storage_type"],
+            "os": data["image"]["os_flavor"],
+            "cluster": data["datacenter"]["name"],
+            "cluster_name": data["datacenter"]["description"],
+            #"server_name": data["datacenter"]["name"],
+            "server_type": data["server_type"]["name"],
+            "server_location": data["datacenter"]["location"],
+            #"server_prices": data["server_type"]["prices"],
+            "server_volumes": data["volumes"],
+    }
+
+
+    #print("==================================")
+    #pprint(vm_data)
+    return self.new_record('vm', vm_data, data)
+
+  def logout(self):
+      self.client = None
