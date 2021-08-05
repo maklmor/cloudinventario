@@ -94,7 +94,7 @@ class CloudCollector:
         data.extend(res.fetch())
       return data
     except Exception:
-      logging.error("Failed to fetch the following resource collector: {}".format(res))
+      logging.error("Failed to fetch the following resource collector: {}".format(res.res_type))
       raise
 
   def logout(self):
