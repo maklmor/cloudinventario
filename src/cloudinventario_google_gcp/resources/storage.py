@@ -24,11 +24,11 @@ class CloudInventarioStorage(CloudInvetarioResource):
 
         self.project_name = self.collector.config['project_id']
         self.client_email = self.collector.config['client_email']
-        logging.info("logging config for GCP storage client_email={}, project_name={}".format(self.config['client_email'], self.project_name))
+        logging.info("logging config for GCP storage client_email={}, project_name={}".format(self.client_email , self.project_name))
 
     def _fetch(self):
         data = []
-        # GET storage 
+        # GET storages
         self.storage = googleapiclient.discovery.build('storage', 'v1', credentials=self.credentials)
 
         # GET all buckets in specific project
@@ -58,12 +58,12 @@ class CloudInventarioStorage(CloudInvetarioResource):
 
             data.append(self._process_resource(bucket))
 
-        logging.info("Collected {} resources".format(len(data)))
+        logging.info("Collected {} storages".format(len(data)))
         self.storage.close()
         return data
 
     def _process_resource(self, bucket):
-        logging.info("new storage bucket name={}".format(bucket.get('name')))
+        logging.info("new storage name={}".format(bucket.get('name')))
         data = {
             "acl": bucket['acl'] if 'acl' in bucket else None,
             "location": bucket['location'],
