@@ -39,6 +39,9 @@ class CloudCollectorGoogleGCP(CloudCollector):
             client_x509_cert_url: 'GCP ClientCertURL',
         }
 
+    def _get_dependencies(self):
+        return ["storage"]
+
     def _login(self):
         credentials = {
             'project_id': self.config['project_id'],
@@ -57,14 +60,14 @@ class CloudCollectorGoogleGCP(CloudCollector):
         self.zone = self.config['zone']
         self.project_name = self.config['project_id']
         self.credentials = service_account.Credentials.from_service_account_info(credentials)
-        logging.info("logging in GCP client_email={}, project_name={}".format(self.config['client_email'], self.project_name))
+        logging.info("logging config for GCP vm client_email={}, project_name={}".format(self.config['client_email'], self.project_name))
 
-        # GET compute engine
-        self.compute_engine = googleapiclient.discovery.build('compute', 'v1', credentials=self.credentials, cache_discovery=False)
-        return self.compute_engine
+        return self.credentials
 
     def _fetch(self, collect):
         data = []
+        # GET compute engine
+        self.compute_engine = googleapiclient.discovery.build('compute', 'v1', credentials=self.credentials, cache_discovery=False)
         
         # GET all instances with specific project name and zone (return JSON, where data are in items)
         _instance = self.compute_engine.instances()
@@ -93,7 +96,8 @@ class CloudCollectorGoogleGCP(CloudCollector):
                 data.append(self._process_vm(instance))
         _instance.close()
 
-        logging.info("Collect {} data".format(len(data)))
+        logging.info("Collected {} vm".format(len(data)))
+        self.compute_engine.close()
         return data
 
     def _process_vm(self, rec):
@@ -169,5 +173,4 @@ class CloudCollectorGoogleGCP(CloudCollector):
         return self.new_record('vm', vm_data, rec)
 
     def _logout(self):
-        self.compute_engine.close()
-        self.compute_engine = None
+        self.credentials = None
