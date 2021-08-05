@@ -58,23 +58,48 @@ class CloudCollectorHetznerHCloud(CloudCollector):
     data = self.__to_dict(server)
 
     networks = []
-#    if data["public_net"]:
-#       networks.append({
-#         "name": "public",
-#         "ip": data["public_net"]["ipv4"]["ip"].
-#       })
-#    for iface in data["private_net"]:
-#       ....
+    if data["public_net"]:
+       networks.append({
+         "name": "public",
+         "ip": data["public_net"]["ipv4"]["ip"],
+       })
+
+    for iface in data["private_net"]:
+      networks.append({
+        "name": iface["alias_ips"],
+        "ip": iface["ip"],
+        "mac": iface["mac_address"],
+        "network": iface["network"]['name'],
+
+       })
+
+    storage_size = 0
+    disks_volumes = []
+    if data["server_type"]["disk"]:
+       storage_size += int(data["server_type"]["disk"] * 1024)
+       disks_volumes.append({
+         "name": "root",
+         "capacity": data["server_type"]["disk"],
+         "type": data["server_type"]["storage_type"],
+      })
+
+    for volume in data['volumes']:
+       storage_size += int(volume["size"] * 1024)
+       disks_volumes.append({
+         "id": volume["id"],
+         "name": volume["name"],
+         "capacity": volume["size"],
+         "format": volume["format"],
+      })
 
     #instance_type = data["InstanceType"]
     #instance_def = self._get_instance_type(instance_type)
     memory_size = data["server_type"]["memory"]*1024
     memory_size = int(memory_size)
-    storage_size = data["server_type"]["disk"]*1024
-    storage_size = int(storage_size)
 
     pprint(data)
     vm_data = {
+            "created": data["created"],
             "id": data["id"],
             "name": data["name"],
             "primary_ip": data["public_net"]["ipv4"]["ip"],
@@ -86,7 +111,7 @@ class CloudCollectorHetznerHCloud(CloudCollector):
             "memory": memory_size,
             "networks": networks,
             "storage": storage_size,
-            "storage_type": data["server_type"]["storage_type"],
+            "storages": disks_volumes,
             "os": data["image"]["os_flavor"],
             "cluster": data["datacenter"]["name"],
             "cluster_name": data["datacenter"]["description"],
@@ -94,12 +119,9 @@ class CloudCollectorHetznerHCloud(CloudCollector):
             "server_type": data["server_type"]["name"],
             "server_location": data["datacenter"]["location"],
             #"server_prices": data["server_type"]["prices"],
-            "server_volumes": data["volumes"],
+            "server_volumes": disks_volumes,
     }
 
-
-    #print("==================================")
-    #pprint(vm_data)
     return self.new_record('vm', vm_data, data)
 
   def logout(self):
