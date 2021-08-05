@@ -1,8 +1,11 @@
+
 import concurrent.futures
 import logging, re, sys, asyncio, time
 from pprint import pprint
+from boto3 import resources
 
 from hcloud import Client
+from httplib2 import Response
 
 from cloudinventario.helpers import CloudCollector
 
@@ -29,7 +32,7 @@ class CloudCollectorHetznerHCloud(CloudCollector):
     res = []
     servers = self.client.servers.get_all()
     for server in servers:
-      res.append(self.__to_dict(server))
+      res.append(self._process_vm(server))
       time.sleep(1/4)
     return res
 
@@ -49,6 +52,77 @@ class CloudCollectorHetznerHCloud(CloudCollector):
     else:
        return obj
     return result
+    
+  def _process_vm(self, server):
 
-  def _logout(self):
-    self.client = None
+    data = self.__to_dict(server)
+
+    networks = []
+    if data["public_net"]:
+       networks.append({
+         "name": "public",
+         "ip": data["public_net"]["ipv4"]["ip"],
+       })
+
+    for iface in data["private_net"]:
+      networks.append({
+        "name": iface["alias_ips"],
+        "ip": iface["ip"],
+        "mac": iface["mac_address"],
+        "network": iface["network"]['name'],
+
+       })
+
+    storage_size = 0
+    disks_volumes = []
+    if data["server_type"]["disk"]:
+       storage_size += int(data["server_type"]["disk"] * 1024)
+       disks_volumes.append({
+         "name": "root",
+         "capacity": data["server_type"]["disk"],
+         "type": data["server_type"]["storage_type"],
+      })
+
+    for volume in data['volumes']:
+       storage_size += int(volume["size"] * 1024)
+       disks_volumes.append({
+         "id": volume["id"],
+         "name": volume["name"],
+         "capacity": volume["size"],
+         "format": volume["format"],
+      })
+
+    #instance_type = data["InstanceType"]
+    #instance_def = self._get_instance_type(instance_type)
+    memory_size = data["server_type"]["memory"]*1024
+    memory_size = int(memory_size)
+
+    pprint(data)
+    vm_data = {
+            "created": data["created"],
+            "id": data["id"],
+            "name": data["name"],
+            "primary_ip": data["public_net"]["ipv4"]["ip"],
+            #"mac_address": None["private_net"]["mac_address"],
+            "status": data["status"],
+            "is_on": (data["status"] == "running"),
+            "cpus": data["server_type"]["cores"],
+            "cputype": data["server_type"]["cpu_type"],
+            "memory": memory_size,
+            "networks": networks,
+            "storage": storage_size,
+            "storages": disks_volumes,
+            "os": data["image"]["os_flavor"],
+            "cluster": data["datacenter"]["name"],
+            "cluster_name": data["datacenter"]["description"],
+            #"server_name": data["datacenter"]["name"],
+            "server_type": data["server_type"]["name"],
+            "server_location": data["datacenter"]["location"],
+            #"server_prices": data["server_type"]["prices"],
+            "server_volumes": disks_volumes,
+    }
+
+    return self.new_record('vm', vm_data, data)
+
+  def logout(self):
+      self.client = None
