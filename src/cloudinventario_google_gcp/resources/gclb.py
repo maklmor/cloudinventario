@@ -126,17 +126,17 @@ class CloudInventarioGclb(CloudInvetarioResource):
     if 'items' in globalAddress:
       for globalAddress in globalAddress['items']:
         result.append({
-          'id': globalAddress['id'],
-          'name': globalAddress['name'],
-          'address': globalAddress['address'],
-          'region': globalAddress['region'],
-          'status': globalAddress['status'],
-          'networkTier': globalAddress['networkTier'],
-          'ipVersion': globalAddress['ipVersion'],
-          'addressType': globalAddress['addressType'],
-          'purpose': globalAddress['purpose'],
-          'subnetwork': globalAddress['subnetwork'],
-          'network': globalAddress['network']
+          'id': globalAddress.get('id'),
+          'name': globalAddress.get('name'),
+          'address': globalAddress.get('address'),
+          'region': globalAddress.get('region'),
+          'status': globalAddress.get('status'),
+          'networkTier': globalAddress.get('networkTier'),
+          'ipVersion': globalAddress.get('ipVersion'),
+          'addressType': globalAddress.get('addressType'),
+          'purpose': globalAddress.get('purpose'),
+          'subnetwork': globalAddress.get('subnetwork'),
+          'network': globalAddress.get('network')
         })
     return result
 
