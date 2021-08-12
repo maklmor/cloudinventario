@@ -57,7 +57,7 @@ class CloudInventarioRds(CloudInvetarioResource):
       "maintenance_window": db['PreferredMaintenanceWindow'],
       "encrypted": db['StorageEncrypted'],
       "public": db['PubliclyAccessible'],
-      "insatnce_class": db['PendingModifiedValues'].get('DBInstanceClass') or db['DBInstanceClass'],
+      "instance_class": db['PendingModifiedValues'].get('DBInstanceClass') or db['DBInstanceClass'],
       "storage": storage * 1024, # in MiB
       "port": db['PendingModifiedValues'].get('Port') or db['Endpoint']['Port'],
       "multi_az": db['PendingModifiedValues'].get('MultiAZ') or db['MultiAZ'],
