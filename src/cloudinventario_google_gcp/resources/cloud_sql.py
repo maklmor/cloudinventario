@@ -76,7 +76,7 @@ class CloudInventarioCloudSQL(CloudInvetarioResource):
         'primary_ip': primary_ip,
         'networks': instance.get('ipAddresses'),
         'tags': instance.get('settings').get('userLabels'),
-        'is_on': 1 if instance.get('state') == "RUNNING" else 0,
+        'is_on': 1 if instance.get('state') == "RUNNABLE" else 0,
 
         'instanceType': instance.get('instanceType'),
         'backendType': instance.get('backendType'),
