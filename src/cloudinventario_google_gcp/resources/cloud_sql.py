@@ -37,10 +37,10 @@ class CloudInventarioCloudSQL(CloudInvetarioResource):
     tiers = _tiers.list(project=self.project_name).execute()
     _tiers.close()
 
-    for instance in instances['items']:
+    for instance in instances.get('items', []):
       # find tier in instance
       instance_tier = instance.get('settings').get('tier') if 'settings' in instance else None
-      instance['tierDetail'] = next((tier for tier in tiers['items'] if str(tier.get('tier')) == instance_tier), None)
+      instance['tierDetail'] = next((tier for tier in tiers.get('items', []) if str(tier.get('tier')) == instance_tier), None)
             
       data.append(self._process_resource(instance))
     
@@ -67,7 +67,7 @@ class CloudInventarioCloudSQL(CloudInvetarioResource):
         'project': instance.get('project'),
         'location': instance.get('region'),
         'created': instance.get('serverCaCert').get('createTime') if 'serverCaCert' in instance else None,
-        'memory': memory, # Max RAM size 
+        'memory': round(memory), # Max RAM size 
         'disks': disks, # Max Disk size
         'storage': storage, # Data disk size
         # 'cpu':, NOT PROVIDED
@@ -75,7 +75,8 @@ class CloudInventarioCloudSQL(CloudInvetarioResource):
         'status': instance.get('state'),
         'primary_ip': primary_ip,
         'networks': instance.get('ipAddresses'),
-        'tags': instance.get('etag'),
+        'tags': instance.get('settings').get('userLabels'),
+        'is_on': 1 if instance.get('state') == "RUNNING" else 0,
 
         'instanceType': instance.get('instanceType'),
         'backendType': instance.get('backendType'),

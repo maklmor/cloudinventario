@@ -168,7 +168,7 @@ class CloudCollectorGoogleGCP(CloudCollector):
             "os": None, # Not found
             "status": rec["status"],
             "is_on": (1 if rec["status"] == "RUNNING" else 0),
-            "tags": rec["tags"]
+            "tags": rec.get('labels')
         }
         return self.new_record('vm', vm_data, rec)
 
