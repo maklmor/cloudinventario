@@ -178,7 +178,7 @@ class CloudCollectorVMWareVCD(CloudCollector):
       "name": rec["name"],
       "cluster": rec["vdcName"],
       "project": rec["vappName"],
-      "description": rec["Description"],
+      "description": rec.get("Description"),
       "id": rec["id"],
       "cpus": int(rec.get("numberOfCpus") or 0),
       "memory": int(rec.get("memoryMB") or 0),

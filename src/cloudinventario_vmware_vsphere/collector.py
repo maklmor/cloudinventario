@@ -433,23 +433,24 @@ class CloudCollectorVMWareVSphere(CloudCollector):
         "connected": nic.connected
       }
 
-      for ip in nic.ipConfig.ipAddress:
-        if not net["ip"] and ip.prefixLength <= 32:	# DUMMY distinguish IPv4 address
-          net["ip"] = ip.ipAddress
-          if ip.prefixLength != 0:
-            net["prefix"] = ip.prefixLength
-          if not rec["primary_ip"]:
-            rec["primary_ip"] = net["ip"]
-        else:
-          if not net.get("aliases"):
-            net["aliases"] = []
-          net["aliases"].append(ip.ipAddress + "/" + str(ip.prefixLength or 32))
-      if net["ip"] and net["ip"] == rec["primary_ip"]:
-        net["primary"] = True
+      if nic.ipConfig:
+        for ip in nic.ipConfig.ipAddress:
+          if not net["ip"] and ip.prefixLength <= 32:	# DUMMY distinguish IPv4 address
+            net["ip"] = ip.ipAddress
+            if ip.prefixLength != 0:
+              net["prefix"] = ip.prefixLength
+            if not rec["primary_ip"]:
+              rec["primary_ip"] = net["ip"]
+          else:
+            if not net.get("aliases"):
+              net["aliases"] = []
+            net["aliases"].append(ip.ipAddress + "/" + str(ip.prefixLength or 32))
+        if net["ip"] and net["ip"] == rec["primary_ip"]:
+          net["primary"] = True
 
       # XXX: Cisco fix
       #   vmguest is not reporting correct data, we have to map config
-      #   to reported IPs (this is big heuristics)
+      #   to reported IPs (this is a big heuristic)
       if len(vm.guest.net) == 1 and \
           net['id'] <= 0 and net['network'] is None and \
           net['mac'] == '00:11:22:33:44:55' and \
