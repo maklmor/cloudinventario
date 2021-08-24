@@ -74,7 +74,7 @@ def collect(data):
 
      cinv.store_status(name,  storage.STATUS_ERROR, runtime, trace)
      logging.error("collector failed with exception", exc_info=e)
-     raise
+     return False
    finally:
      setproctitle.setproctitle(proctitle)
    return False
