@@ -276,6 +276,7 @@ class CloudCollectorVMWareVSphere(CloudCollector):
         "cpus": int(rec.get("cpus") or 0),
         "memory": int(rec.get("memory") or 0),
         "storage": int(rec.get("storage") or 0),
+        "storages": rec.get("storages"),
         "primary_ip": rec["primary_ip"],
         "management_ip": rec["management_ip"],
         "networks": rec["networks"],
