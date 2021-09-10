@@ -1,12 +1,12 @@
-import boto3, json
+import boto3, json, logging
 from pprint import pprint
 
 from cloudinventario.helpers import CloudInvetarioResource
 
 def setup(resource, collector):
-  return CloudInventarioLightsailLoadBalancers(resource, collector)
+  return CloudInventarioLightsailLB(resource, collector)
 
-class CloudInventarioLightsailLoadBalancers(CloudInvetarioResource):
+class CloudInventarioLightsailLB(CloudInvetarioResource):
 
   def __init__(self, resource, collector):
     super().__init__(resource, collector)
@@ -43,7 +43,7 @@ class CloudInventarioLightsailLoadBalancers(CloudInvetarioResource):
 
     tags = {}
     for tag in balancer.get("tags", []):
-      tags[ tag["key"] ] = tag["value"]
+      tags[ tag["key"] ] = tag.get("value")
 
     data = {
       "created": balancer.get('createdAt'),
@@ -52,7 +52,7 @@ class CloudInventarioLightsailLoadBalancers(CloudInvetarioResource):
       "location": location.get('availabilityZone'),
       "id": balancer.get('arn'),
       "instances": health_states,
-      "dns_name": balancer['dnsName'],
+      "dns_name": balancer.get('dnsName'),
       "owner": self.collector.account_id,
       "status": status,
       "is_on": True if status == "active" or status == "active_impaired" else False,
