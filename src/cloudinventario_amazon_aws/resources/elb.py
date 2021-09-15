@@ -24,20 +24,9 @@ class CloudInventarioElb(CloudInvetarioResource):
     paginator = self.client.get_paginator('describe_load_balancers')
     response_iterator = paginator.paginate()
 
-    marker = None
-    while True:
-      if marker:
-        response_iterator = self.client.describe_load_balancers(Marker=marker)
-      else:
-        response_iterator = self.client.describe_load_balancers()
-
-      for lb in response_iterator['LoadBalancerDescriptions']:
+    for page in response_iterator:
+      for lb in page['LoadBalancerDescriptions']:
         data.append(self.process_resource(lb))
-
-      try:
-        marker = response_iterator['Marker']
-      except Exception:
-        break
 
     return data
 

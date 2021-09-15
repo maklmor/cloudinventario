@@ -41,17 +41,13 @@ class CloudCollectorAmazonLightsail(CloudCollectorAmazonAWS):
 
   def _fetch(self, collect):
     data = []
+    paginator = self.client.get_paginator('get_instances')
+    response_iterator = paginator.paginate()
 
-    next_page_token = ""
-    while True:
-      instances = self.client.get_instances(pageToken=next_page_token)
-
-      for instance in instances.get('instances', []):
+    for page in response_iterator:
+      for instance in page['instances']:
         data.append(self._process_vm(instance))
 
-      next_page_token = instances.get('nextPageToken')
-      if not next_page_token:
-        break
     return data
 
   def _process_vm(self, instance):

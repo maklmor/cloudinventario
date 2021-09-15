@@ -20,19 +20,12 @@ class CloudInventarioEbs(CloudInvetarioResource):
 
   def _fetch(self):
     data = []
+    pagiantor = self.client.get_paginator('describe_volumes')
+    response_iterator = pagiantor.paginate()
 
-    next_token = ""
-    while True:
-      vinfo = self.client.describe_volumes(MaxResults=100, NextToken=next_token)
-
-      for volume in vinfo['Volumes']:
+    for page in response_iterator:
+      for volume in page['Volumes']:
         data.append(self.process_resource(volume))
-
-      next_token = None
-      if 'NextToken' in vinfo:
-         next_token = vinfo['NextToken']
-      if not next_token:
-        break
 
     return data
 
