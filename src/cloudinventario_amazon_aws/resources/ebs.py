@@ -44,7 +44,8 @@ class CloudInventarioEbs(CloudInvetarioResource):
     "is_on": (volume['State'] == 'in-use'),
     "encrypted": volume['Encrypted'],
     "mounts": mounts,
-    "details": volume
+    "details": volume,
+    "tags": self.collector._get_tags(volume)
     }
 
     return self.new_record(self.res_type, data, volume)

@@ -89,9 +89,16 @@ class CloudCollectorAmazonAWS(CloudCollector):
 
     return self.instance_types[itype]
 
+  def _get_tags(self, data, tag_key="Tags"):
+    tags = {}
+    for tag in data.get(tag_key , []):
+      tags[ tag["Key"] ] = tag.get("Value")
+    return tags
+
   def _process_vm(self, rec):
     instance_type = rec["InstanceType"]
     instance_def = self._get_instance_type(instance_type)
+    tags = self._get_tags(rec)
 
     networks = []
     for iface in rec["NetworkInterfaces"]:
@@ -122,10 +129,6 @@ class CloudCollectorAmazonAWS(CloudCollector):
     if ebs_data and rec["InstanceId"] in ebs_data:
       storage = ebs_data[rec["InstanceId"]]["size"]
       storages = ebs_data[rec["InstanceId"]]["storages"]
-
-    tags = {}
-    for tag in rec.get("Tags", []):
-      tags[ tag["Key"] ] = tag["Value"]
 
     name = tags.get("Name") or rec["InstanceId"]
     logging.debug("new VM name={}".format(name))

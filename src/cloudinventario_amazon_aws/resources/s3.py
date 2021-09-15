@@ -84,6 +84,15 @@ class CloudInventarioS3(CloudInvetarioResource):
       versioning = None
       logging.info("The acl of the following bucket was not found: {}, you must be owner".format(bucket_name))
 
+    try: # tags
+      tags = self.client.get_bucket_tagging(Bucket=bucket_name)
+      tags.pop('ResponseMetadata', None)
+      details["tags"] = tags
+      tags = self.collector._get_tags(tags, 'TagSet')
+    except Exception:
+      tags = None
+      logging.info("The tags of the following bucket were not found: {}, you need the \"s3:GetBucketTagging\" permission".format(bucket_name))
+
     data = {
       "acl": acl,
       "location": location,
@@ -93,7 +102,8 @@ class CloudInventarioS3(CloudInvetarioResource):
       "website": website,
       "name": bucket_name,
       "id": bucket_name,
-      "owner": owner_id
+      "owner": owner_id,
+      "tags": tags
     }
 
     return self.new_record(self.res_type, data, details)
