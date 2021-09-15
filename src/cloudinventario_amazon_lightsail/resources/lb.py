@@ -41,10 +41,6 @@ class CloudInventarioLightsailLB(CloudInvetarioResource):
         "reason": instance.get('instanceHealthReason')
       }
 
-    tags = {}
-    for tag in balancer.get("tags", []):
-      tags[ tag["key"] ] = tag.get("value")
-
     data = {
       "created": balancer.get('createdAt'),
       "name": balancer.get('name'),
@@ -56,7 +52,7 @@ class CloudInventarioLightsailLB(CloudInvetarioResource):
       "owner": self.collector.account_id,
       "status": status,
       "is_on": True if status == "active" or status == "active_impaired" else False,
-      "tags": tags
+      "tags": self.collector._get_tags(balancer)
     }
 
     return self.new_record(self.res_type, data, balancer)

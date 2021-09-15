@@ -35,10 +35,6 @@ class CloudInventarioLightsailDB(CloudInvetarioResource):
     status = db.get('state')
     endpoint = db.get('masterEndpoint', {})
 
-    tags = {}
-    for tag in db.get("tags", []):
-      tags[ tag["key"] ] = tag.get("value")
-
     data = {
       "name": db.get('name'),
       "type": db.get('engine'),
@@ -55,7 +51,7 @@ class CloudInventarioLightsailDB(CloudInvetarioResource):
       "port": endpoint.get('port'),
       "address": endpoint.get('address'),
       "public": db.get('publiclyAccessible'),
-      "tags": tags
+      "tags": self.collector._get_tags(db)
     }
 
     return self.new_record(self.res_type, data, db)

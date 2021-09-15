@@ -50,6 +50,12 @@ class CloudCollectorAmazonLightsail(CloudCollectorAmazonAWS):
 
     return data
 
+  def _get_tags(self, data, tag_key="tags"):
+    tags = {}
+    for tag in data.get(tag_key , []):
+      tags[ tag["key"] ] = tag.get("value")
+    return tags
+
   def _process_vm(self, instance):
     hardware = instance.get('hardware', {})
     location = instance.get('location', {})
@@ -73,10 +79,6 @@ class CloudCollectorAmazonLightsail(CloudCollectorAmazonAWS):
         "details": disk
       })
 
-    tags = {}
-    for tag in instance.get("tags", []):
-      tags[ tag["key"] ] = tag["value"]
-
     data = {
       "created": instance.get('createdAt'),
       "name": instance.get('name'),
@@ -95,7 +97,7 @@ class CloudCollectorAmazonLightsail(CloudCollectorAmazonAWS):
       "blueprint_name": instance.get('blueprintName'),  # may contain information about instance os
       "status": state.get('name'),
       "is_on": (state.get('name') == "running" and 1 or 0),
-      "tags": tags
+      "tags": self._get_tags(instance)
     }
     return self.new_record('lightsail', data, instance)
 

@@ -33,11 +33,6 @@ class CloudInventarioLightsailDisks(CloudInvetarioResource):
     location = disk.get('location', {})
     status = disk.get('state')
 
-    tags = {}
-    for tag in disk.get("tags", []):
-      tags[ tag["key"] ] = tag.get("value")
-
-
     data = {
       "created": disk.get('createdAt'),
       "name": disk.get('name'),
@@ -51,7 +46,7 @@ class CloudInventarioLightsailDisks(CloudInvetarioResource):
       "status": status,
       "iops": disk.get('iops'),
       "is_on": True if disk.get('isAttached') and status in ('available', 'in-use') else False,
-      "tags": tags
+      "tags": self.collector._get_tags(disk)
     }
 
     return self.new_record(self.res_type, data, disk)
