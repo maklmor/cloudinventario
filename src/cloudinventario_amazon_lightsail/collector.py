@@ -41,18 +41,20 @@ class CloudCollectorAmazonLightsail(CloudCollectorAmazonAWS):
 
   def _fetch(self, collect):
     data = []
+    paginator = self.client.get_paginator('get_instances')
+    response_iterator = paginator.paginate()
 
-    next_page_token = ""
-    while True:
-      instances = self.client.get_instances(pageToken=next_page_token)
-
-      for instance in instances.get('instances', []):
+    for page in response_iterator:
+      for instance in page['instances']:
         data.append(self._process_vm(instance))
 
-      next_page_token = instances.get('nextPageToken')
-      if not next_page_token:
-        break
     return data
+
+  def _get_tags(self, data, tag_key="tags"):
+    tags = {}
+    for tag in data.get(tag_key , []):
+      tags[ tag["key"] ] = tag.get("value")
+    return tags
 
   def _process_vm(self, instance):
     hardware = instance.get('hardware', {})
@@ -77,10 +79,6 @@ class CloudCollectorAmazonLightsail(CloudCollectorAmazonAWS):
         "details": disk
       })
 
-    tags = {}
-    for tag in instance.get("tags", []):
-      tags[ tag["key"] ] = tag["value"]
-
     data = {
       "created": instance.get('createdAt'),
       "name": instance.get('name'),
@@ -99,7 +97,7 @@ class CloudCollectorAmazonLightsail(CloudCollectorAmazonAWS):
       "blueprint_name": instance.get('blueprintName'),  # may contain information about instance os
       "status": state.get('name'),
       "is_on": (state.get('name') == "running" and 1 or 0),
-      "tags": tags
+      "tags": self._get_tags(instance)
     }
     return self.new_record('lightsail', data, instance)
 

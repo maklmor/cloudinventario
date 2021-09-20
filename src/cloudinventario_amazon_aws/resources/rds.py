@@ -24,20 +24,9 @@ class CloudInventarioRds(CloudInvetarioResource):
     paginator = self.client.get_paginator('describe_db_instances')
     response_iterator = paginator.paginate()
 
-    marker = None
-    while True:
-      if marker:
-        response_iterator = self.client.describe_db_instances(Marker=marker)
-      else:
-        response_iterator = self.client.describe_db_instances()
-
-      for db_instance in response_iterator['DBInstances']:
+    for page in response_iterator:
+      for db_instance in page['DBInstances']:
         data.append(self.process_resource(db_instance))
-
-      try:
-        marker = response_iterator['Marker']
-      except Exception:
-        break
 
     return data
 
@@ -63,7 +52,8 @@ class CloudInventarioRds(CloudInvetarioResource):
       "multi_az": db['PendingModifiedValues'].get('MultiAZ') or db['MultiAZ'],
       "version": db['PendingModifiedValues'].get('EngineVersion') or db['EngineVersion'],
       "id": db['PendingModifiedValues'].get('DBInstanceIdentifier') or db['DBInstanceIdentifier'],
-      "storage_type": db['PendingModifiedValues'].get('StorageType') or db['StorageType']
+      "storage_type": db['PendingModifiedValues'].get('StorageType') or db['StorageType'],
+      "tags": self.collector._get_tags(db, "TagList")
     }
 
     return self.new_record(self.res_type, data, db)

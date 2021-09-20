@@ -24,20 +24,9 @@ class CloudInventarioElb(CloudInvetarioResource):
     paginator = self.client.get_paginator('describe_load_balancers')
     response_iterator = paginator.paginate()
 
-    marker = None
-    while True:
-      if marker:
-        response_iterator = self.client.describe_load_balancers(Marker=marker)
-      else:
-        response_iterator = self.client.describe_load_balancers()
-
-      for lb in response_iterator['LoadBalancerDescriptions']:
+    for page in response_iterator:
+      for lb in page['LoadBalancerDescriptions']:
         data.append(self.process_resource(lb))
-
-      try:
-        marker = response_iterator['Marker']
-      except Exception:
-        break
 
     return data
 
@@ -59,6 +48,12 @@ class CloudInventarioElb(CloudInvetarioResource):
         "state": instance['State']
       }
 
+    tags_data = self.client.describe_tags(LoadBalancerNames=[
+      balancer.get('LoadBalancerName', "")
+      ])
+    balancer.update(tags_data)
+    tags = self.collector._get_tags(tags_data['TagDescriptions'][0])
+
     data = {
       "created": balancer['CreatedTime'],
       "name": balancer['LoadBalancerName'],
@@ -70,7 +65,8 @@ class CloudInventarioElb(CloudInvetarioResource):
       "status": health_states,
       "is_on": True if status == "on" else False,
       "scheme": balancer['Scheme'],
-      "subnets": balancer['Subnets']
+      "subnets": balancer['Subnets'],
+      "tags": tags
     }
 
     return self.new_record(self.res_type, data, balancer)
