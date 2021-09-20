@@ -36,7 +36,7 @@ class CloudCollectorHetznerHCloud(CloudCollector):
       time.sleep(1/4)
     return res
 
-  def __to_dict(self, obj, key = None, level = 0):
+  def _to_dict(self, obj, key = None, level = 0):
     result = {}
     level += 1
     # ignore list
@@ -44,18 +44,18 @@ class CloudCollectorHetznerHCloud(CloudCollector):
        return None
     if hasattr(obj, '__slots__') and len(obj.__slots__) > 0:
        for key in obj.__slots__:
-         result[key[0].lower() + key[1:]] = self.__to_dict(getattr(obj, key), key, level)
+         result[key[0].lower() + key[1:]] = self._to_dict(getattr(obj, key), key, level)
     elif isinstance(obj, list):
        result = []
        for rec in obj:
-         result.append(self.__to_dict(rec, key, level))
+         result.append(self._to_dict(rec, key, level))
     else:
        return obj
     return result
     
   def _process_vm(self, server):
 
-    data = self.__to_dict(server)
+    data = self._to_dict(server)
 
     networks = []
     if data["public_net"]:
@@ -97,7 +97,7 @@ class CloudCollectorHetznerHCloud(CloudCollector):
     memory_size = data["server_type"]["memory"]*1024
     memory_size = int(memory_size)
 
-    pprint(data)
+    #pprint(data)
     vm_data = {
             "created": data["created"],
             "id": data["id"],
